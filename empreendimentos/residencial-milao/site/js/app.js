@@ -390,7 +390,10 @@
   renderAndares();
   function webglOk() { try { const c = document.createElement('canvas'); return !!(window.WebGLRenderingContext && (c.getContext('webgl') || c.getContext('experimental-webgl'))); } catch (e) { return false; } }
   function falhou() { $('loading').classList.add('is-done'); $('stageError').hidden = false; $('stageHint').hidden = true; }
+  let tentativas = 0;
   function iniciar() {
+    // a biblioteca 3D pode chegar depois deste script (CDN lenta ou carregamento fora de ordem): espera até ~8 s
+    if (!window.__libFail && (!window.THREE || !THREE.OrbitControls) && tentativas++ < 50) { setTimeout(iniciar, 160); return; }
     if (window.__libFail || !window.THREE || !THREE.OrbitControls || !webglOk()) { falhou(); return; }
     try {
       predio = Predio3D.create({

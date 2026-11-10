@@ -1,0 +1,7 @@
+# gerado por ferramentas/montar_artifact.py
+dist/
+
+# sistema
+.DS_Store
+Thumbs.db
+__pycache__/

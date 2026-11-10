@@ -1,0 +1,143 @@
+/* Layout: maquete 3D de ponta a ponta; ficha do imóvel no alto à esquerda, cômodos no alto à direita, doca de controles ancorada embaixo; na visita, joystick acima da doca. */
+:root{
+  --bg:#E6E8EB;
+  --panel:rgba(251,251,250,.9);
+  --panel-solid:#FBFBFA;
+  --ink:#1A2030;
+  --muted:#586172;
+  --line:rgba(26,32,48,.14);
+  --chip:rgba(26,32,48,.07);
+  --accent:#D3A02B;
+  --accent-ink:#1A2030;
+  --shadow:0 1px 2px rgba(18,22,32,.06),0 10px 28px rgba(18,22,32,.12);
+  --f-ui:"Archivo","Helvetica Neue",Arial,sans-serif;
+  --f-num:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#13161B;--panel:rgba(27,31,39,.9);--panel-solid:#1B1F27;--ink:#ECEEF2;--muted:#A3ABB8;
+    --line:rgba(236,238,242,.14);--chip:rgba(236,238,242,.08);--accent:#E2B444;--accent-ink:#14171C;
+    --shadow:0 1px 2px rgba(0,0,0,.35),0 12px 32px rgba(0,0,0,.42);color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#13161B;--panel:rgba(27,31,39,.9);--panel-solid:#1B1F27;--ink:#ECEEF2;--muted:#A3ABB8;
+  --line:rgba(236,238,242,.14);--chip:rgba(236,238,242,.08);--accent:#E2B444;--accent-ink:#14171C;
+  --shadow:0 1px 2px rgba(0,0,0,.35),0 12px 32px rgba(0,0,0,.42);color-scheme:dark;
+}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-ui);overflow:hidden;-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit}
+.app{position:relative;height:100%;overflow:hidden}
+#stage{position:absolute;inset:0}
+#stage canvas{display:block;width:100%;height:100%;touch-action:none;outline:none;cursor:grab}
+#stage canvas:active{cursor:grabbing}
+.app.is-immersive #stage canvas{cursor:crosshair}
+.app.is-locked #stage canvas{cursor:none}
+/* mira no centro da tela (contorno escuro + traço claro: legível sobre qualquer cena) */
+.crosshair{position:absolute;left:50%;top:50%;width:22px;height:22px;margin:-11px 0 0 -11px;pointer-events:none}
+.crosshair::before,.crosshair::after{content:"";position:absolute;background:#FFFFFF;box-shadow:0 0 0 1.5px rgba(10,12,16,.55);border-radius:1px}
+.crosshair::before{left:10px;top:3px;width:2px;height:16px}
+.crosshair::after{left:3px;top:10px;width:16px;height:2px}
+
+/* rótulos dos cômodos sobre a maquete */
+.labels{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.pill{position:absolute;left:0;top:0;pointer-events:auto;display:grid;justify-items:center;gap:1px;padding:5px 9px 4px;
+  border-radius:8px;background:var(--panel-solid);border:1px solid var(--line);box-shadow:var(--shadow);cursor:pointer;white-space:nowrap;will-change:transform}
+.pill b{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;font-stretch:78%}
+.pill span{font-family:var(--f-num);font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
+.pill:hover,.pill:focus-visible{border-color:var(--accent);outline:none}
+
+/* camada de interface */
+.ui{position:absolute;inset:0;pointer-events:none;display:grid;grid-template-columns:minmax(0,1fr) auto;
+  grid-template-rows:auto minmax(0,1fr) auto;column-gap:12px;row-gap:10px;padding-block:14px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.ui>*{pointer-events:auto}
+.card{background:var(--panel);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow)}
+
+.title{grid-area:1/1/2/2;justify-self:start;align-self:start;padding:12px 14px 12px;max-width:350px;min-width:0}
+.eyebrow{margin:0;font-size:11px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-stretch:85%}
+.title h1{margin:3px 0 10px;font-size:23px;line-height:1.05;font-weight:780;font-stretch:72%;letter-spacing:.005em;text-wrap:balance}
+.facts{display:flex;flex-wrap:wrap;gap:6px 16px;margin:0}
+.facts div{display:grid;gap:1px}
+.facts dt{font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-stretch:85%}
+.facts dd{margin:0;font-family:var(--f-num);font-size:13px;font-weight:600;font-variant-numeric:tabular-nums}
+
+.visit{grid-area:1/1/2/2;justify-self:start;align-self:start;display:flex;align-items:center;gap:10px;padding:8px 8px 8px 14px;min-width:0;max-width:100%}
+.visit p{margin:0;display:grid;gap:1px;min-width:0}
+.visit small{font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.visit strong{font-size:17px;font-weight:760;font-stretch:76%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.visit .btns{display:flex;gap:6px;flex:none}
+
+.rooms{grid-area:1/2/3/3;align-self:start;width:262px;max-height:100%;overflow:auto;padding:4px}
+.rooms summary{list-style:none;display:flex;align-items:baseline;justify-content:space-between;gap:10px;padding:8px 10px;cursor:pointer;border-radius:10px;
+  font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;font-stretch:85%}
+.rooms summary::-webkit-details-marker{display:none}
+.rooms summary::after{content:"";width:7px;height:7px;border-right:1.6px solid currentColor;border-bottom:1.6px solid currentColor;transform:rotate(45deg) translateY(-3px);opacity:.6;margin-left:auto}
+.rooms[open] summary::after{transform:rotate(225deg) translateY(-1px)}
+.rooms summary .mono{font-family:var(--f-num);font-weight:600;letter-spacing:0;text-transform:none;font-size:12px;color:var(--muted)}
+.rooms summary:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.rooms ul{list-style:none;margin:0;padding:2px 0 4px;display:grid;gap:1px}
+.room-btn{appearance:none;border:0;background:transparent;width:100%;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:baseline;gap:2px 10px;
+  text-align:left;padding:7px 10px;border-radius:9px;cursor:pointer}
+.room-btn:hover{background:var(--chip)}
+.room-btn:focus-visible{outline:2px solid var(--accent);outline-offset:-1px}
+.room-btn[aria-current="true"]{background:var(--chip);box-shadow:inset 3px 0 0 var(--accent)}
+.room-btn .n{font-size:14px;font-weight:650;font-stretch:88%}
+.room-btn .a{font-family:var(--f-num);font-size:12.5px;font-weight:600;font-variant-numeric:tabular-nums}
+.room-btn .d{grid-column:1/-1;font-family:var(--f-num);font-size:11px;color:var(--muted)}
+.rooms .note{margin:2px 10px 8px;font-size:11.5px;line-height:1.4;color:var(--muted);max-width:32ch}
+
+.dock{grid-area:3/1/4/3;justify-self:center;display:flex;flex-direction:column;align-items:center;gap:6px;padding:7px;border-radius:16px;max-width:100%}
+.dock-row{display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:6px}
+.seg{display:inline-flex;flex-wrap:wrap;justify-content:center;gap:2px;padding:3px;border-radius:11px;background:var(--chip)}
+.toggles{display:flex;flex-wrap:wrap;justify-content:center;gap:2px}
+.btn{appearance:none;border:0;background:transparent;display:inline-flex;align-items:center;gap:6px;min-height:36px;padding:7px 11px;border-radius:9px;
+  font-size:13px;font-weight:620;font-stretch:90%;cursor:pointer;color:var(--ink);white-space:nowrap}
+.btn svg{width:16px;height:16px;flex:none;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.btn:hover{background:var(--chip)}
+.btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.seg .btn[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+.toggle .dot{width:7px;height:7px;border-radius:50%;border:1.5px solid currentColor;opacity:.5;flex:none}
+.toggle[aria-pressed="true"] .dot{background:var(--accent);border-color:var(--accent);opacity:1}
+.btn-exit{background:var(--ink);color:var(--bg)}
+.btn-exit:hover{background:var(--ink);opacity:.88}
+.btn-stand{background:var(--accent);color:var(--accent-ink)}
+.btn-stand:hover{background:var(--accent);opacity:.9}
+.hint{margin:0;padding:0 8px 2px;font-size:12px;line-height:1.35;color:var(--muted);text-align:center;max-width:72ch}
+
+.app.is-immersive .title,.app.is-immersive .toggles{display:none}
+
+/* controles de toque na visita e na câmera livre */
+.touch{position:absolute;left:0;right:0;bottom:150px;display:flex;justify-content:space-between;align-items:flex-end;pointer-events:none;
+  padding-left:max(20px,env(safe-area-inset-left,0px));padding-right:max(20px,env(safe-area-inset-right,0px))}
+.joy{pointer-events:auto;position:relative;width:118px;height:118px;border-radius:50%;background:var(--panel);border:1px solid var(--line);box-shadow:var(--shadow);
+  -webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);touch-action:none}
+.joy::before{content:"";position:absolute;inset:26px;border-radius:50%;border:1px dashed var(--line)}
+.knob{position:absolute;left:50%;top:50%;width:50px;height:50px;margin:-25px 0 0 -25px;border-radius:50%;background:var(--ink);opacity:.85;box-shadow:var(--shadow)}
+.updown{pointer-events:auto;display:grid;gap:10px}
+.updown button{appearance:none;width:56px;height:56px;border-radius:50%;border:1px solid var(--line);background:var(--panel);box-shadow:var(--shadow);
+  display:grid;place-items:center;touch-action:none;cursor:pointer;color:var(--ink)}
+.updown svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.updown button:active{background:var(--accent);color:var(--accent-ink)}
+
+.tip{position:absolute;left:0;top:0;pointer-events:none;padding:5px 9px;border-radius:7px;background:var(--ink);color:var(--bg);font-size:12px;font-weight:650;
+  white-space:nowrap;box-shadow:var(--shadow)}
+
+.loading{position:absolute;inset:0;display:grid;place-items:center;background:var(--bg);color:var(--muted);font-size:14px;letter-spacing:.02em;transition:opacity .45s ease}
+.loading.done{opacity:0;pointer-events:none}
+.error{position:absolute;left:max(16px,env(safe-area-inset-left,0px));right:max(16px,env(safe-area-inset-right,0px));top:40%;margin:0 auto;max-width:440px;padding:16px 18px;font-size:14px;line-height:1.5}
+.error strong{display:block;font-size:16px;margin-bottom:4px}
+
+@media (max-width:759px){
+  .ui{grid-template-columns:minmax(0,1fr);grid-template-rows:auto auto minmax(0,1fr) auto;row-gap:8px;padding-block:10px}
+  .title{grid-area:1/1/2/2;justify-self:stretch;max-width:none;padding:10px 12px}
+  .title h1{font-size:19px;margin:2px 0 7px}
+  .visit{grid-area:1/1/2/2;justify-self:stretch}
+  .rooms{grid-area:2/1/3/2;justify-self:start;width:min(262px,100%)}
+  .dock{grid-area:4/1/5/2;justify-self:stretch}
+  .btn{padding:7px 9px;font-size:12.5px}
+  .pill i{display:none}
+}
+@media (prefers-reduced-motion:reduce){.loading{transition:none}}

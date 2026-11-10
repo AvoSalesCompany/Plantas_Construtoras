@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Residencial Milão</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="Escolha a torre, o andar e o apartamento do Residencial Milão em 3D e entre no apartamento por dentro.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="css/site.css">
+</head>
+<body>
+
+<header class="nav">
+  <div class="nav-in">
+    <a class="brand" href="#explorar" aria-label="Residencial Milão, início">
+      <span class="brand-mark" aria-hidden="true"></span>
+      <span class="brand-name">MILÃO</span>
+    </a>
+    <nav class="nav-links" aria-label="Seções">
+      <a href="#explorar">Explorar</a>
+      <a href="#plantas">Plantas</a>
+      <a href="#lazer">Lazer</a>
+      <a href="#condicoes">Condições</a>
+      <a href="#localizacao">Localização</a>
+    </nav>
+    <a class="btn btn-gold nav-cta" href="#interesse">Quero o meu</a>
+  </div>
+</header>
+
+<main>
+  <!-- 1. Explorador: torres em 3D + painel de andares e apartamentos -->
+  <section class="explorer" id="explorar" aria-label="Escolha seu apartamento">
+    <div class="stage" id="stage">
+      <div class="hero-copy" id="heroCopy">
+        <p class="eyebrow">Residencial Milão · Feitoria, São Leopoldo/RS</p>
+        <h1>Escolha o andar.<br>Entre no seu apê.</h1>
+        <p class="lede">Gire as duas torres, toque num andar para ver os 12 apartamentos e abra o apartamento por dentro em 3D.</p>
+        <dl class="hero-facts">
+          <div><dt>Apartamentos</dt><dd>288</dd></div>
+          <div><dt>Dormitórios</dt><dd>2</dd></div>
+          <div><dt>Área privativa</dt><dd>47 a 50 m²</dd></div>
+          <div><dt>Entrega prevista</dt><dd>jan/2029</dd></div>
+        </dl>
+      </div>
+
+      <div class="canvas-box" id="canvasBox">
+        <canvas id="predio" tabindex="0" aria-label="Torres do Residencial Milão em 3D. Arraste para girar e toque num andar."></canvas>
+        <div class="labels" id="labels"></div>
+
+        <div class="stage-tools">
+          <button class="chip" id="btnHome" type="button">
+            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 7.5 8 3l5.5 4.5M4 6.5V13h3V9.5h2V13h3V6.5"/></svg>Ver as duas torres
+          </button>
+        </div>
+        <p class="stage-hint" id="stageHint">Arraste para girar · role ou faça pinça para aproximar · toque num andar</p>
+        <div class="tip" id="tip" hidden></div>
+        <div class="loading" id="loading"><span>Montando as torres…</span></div>
+        <div class="stage-error" id="stageError" hidden>
+          <strong>O 3D não abriu neste navegador.</strong>
+          Ele precisa de WebGL. Você ainda pode escolher o andar e o apartamento pelo painel ao lado.
+        </div>
+      </div>
+    </div>
+
+    <aside class="panel" id="painel" aria-label="Andares e apartamentos">
+      <div class="panel-head">
+        <div class="seg" role="group" aria-label="Torre">
+          <button type="button" class="seg-btn" id="torreA" aria-pressed="true">Torre A</button>
+          <button type="button" class="seg-btn" id="torreB" aria-pressed="false">Torre B</button>
+        </div>
+        <label class="select">
+          <span class="visually-hidden">Tipo de planta</span>
+          <select id="filtroTipo">
+            <option value="todos">Todas as plantas</option>
+            <option value="sem-sacada">Sem sacada · 47,08 m²</option>
+            <option value="com-sacada">Com sacada · 49,69 m²</option>
+          </select>
+        </label>
+      </div>
+
+      <ul class="legend" aria-label="Legenda">
+        <li><i class="dot is-livre"></i>Disponível</li>
+        <li><i class="dot is-reservado"></i>Reservado</li>
+        <li><i class="dot is-vendido"></i>Vendido</li>
+      </ul>
+
+      <!-- lista de andares -->
+      <div class="view" id="viewAndares">
+        <p class="panel-title"><span id="tituloTorre">Torre A</span> · <span id="livresTorre">0</span> disponíveis</p>
+        <ol class="floors" id="listaAndares" reversed></ol>
+      </div>
+
+      <!-- andar aberto -->
+      <div class="view" id="viewAndar" hidden>
+        <div class="floor-head">
+          <button class="back" id="btnVoltar" type="button">
+            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10 3 5 8l5 5"/></svg>Andares
+          </button>
+          <p class="floor-title"><span id="andarTitulo">8º andar</span><small id="andarSub">Torre A · piso a 22,7 m do chão</small></p>
+        </div>
+        <div class="plate-wrap">
+          <svg class="plate" id="planta" viewBox="-10 -26 560 214" role="img" aria-label="Planta do andar com os 12 apartamentos"></svg>
+        </div>
+        <div class="unit" id="unidade">
+          <p class="unit-empty">Toque num apartamento na planta ou no prédio.</p>
+        </div>
+      </div>
+
+      <p class="panel-note">Disponibilidade ilustrativa. No site em produção ela vem do sistema de vendas.</p>
+    </aside>
+  </section>
+
+  <!-- 2. Plantas -->
+  <section class="band" id="plantas">
+    <div class="wrap">
+      <header class="sec-head">
+        <p class="eyebrow">Plantas</p>
+        <h2>Duas plantas, os mesmos dois quartos</h2>
+        <p class="sec-lede">Os apartamentos de meio não têm sacada. Os quatro de canto de cada andar têm sacada e cozinha maior.</p>
+      </header>
+      <div class="plans" id="cartoesPlantas"></div>
+      <ul class="finishes" id="acabamentos"></ul>
+    </div>
+  </section>
+
+  <!-- 3. Lazer -->
+  <section class="band band-alt" id="lazer">
+    <div class="wrap">
+      <header class="sec-head">
+        <p class="eyebrow">Lazer e condomínio</p>
+        <h2>O que fica do portão para dentro</h2>
+      </header>
+      <ul class="amenities" id="listaLazer"></ul>
+      <p class="sec-foot" id="vagas"></p>
+    </div>
+  </section>
+
+  <!-- 4. Condições e obra -->
+  <section class="band" id="condicoes">
+    <div class="wrap two">
+      <div>
+        <header class="sec-head">
+          <p class="eyebrow">Condições</p>
+          <h2>Minha Casa Minha Vida</h2>
+          <p class="sec-lede">Venda na planta com financiamento de até 100% pela Caixa.</p>
+        </header>
+        <dl class="terms" id="condicoesLista"></dl>
+        <p class="fine">Valores de referência divulgados pela construtora. Condições sujeitas a análise de crédito e alteração.</p>
+      </div>
+      <div class="build">
+        <p class="eyebrow">Obra</p>
+        <p class="build-status"><span class="pulse" aria-hidden="true"></span><span id="obraStatus">Em construção</span></p>
+        <p class="build-date">Entrega prevista <strong id="obraEntrega">jan/2029</strong></p>
+        <ol class="timeline" id="obraLinha"></ol>
+      </div>
+    </div>
+  </section>
+
+  <!-- 5. Localização -->
+  <section class="band band-alt" id="localizacao">
+    <div class="wrap two">
+      <header class="sec-head">
+        <p class="eyebrow">Localização</p>
+        <h2 id="endereco">Rua Marieta Fialho Blessmann, 276</h2>
+        <p class="sec-lede" id="bairro">Feitoria · São Leopoldo/RS</p>
+        <a class="btn btn-line" id="linkMapa" href="#" target="_blank" rel="noopener">Abrir no Google Maps</a>
+      </header>
+      <div>
+        <p class="eyebrow">Perto de</p>
+        <ul class="nearby" id="perto"></ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- 6. Interesse -->
+  <section class="band" id="interesse">
+    <div class="wrap two">
+      <header class="sec-head">
+        <p class="eyebrow">Interesse</p>
+        <h2>Monte sua mensagem</h2>
+        <p class="sec-lede">Escolha um apartamento no prédio, ajuste a mensagem e copie para enviar ao plantão de vendas.</p>
+      </header>
+      <form class="msg" id="formMsg" novalidate>
+        <p class="msg-unit" id="msgUnidade">Nenhum apartamento escolhido ainda.</p>
+        <label for="msgNome">Seu nome</label>
+        <input id="msgNome" type="text" autocomplete="name" placeholder="Ex.: Ana Souza">
+        <label for="msgTexto">Mensagem</label>
+        <textarea id="msgTexto" rows="5"></textarea>
+        <div class="msg-actions">
+          <button class="btn btn-gold" type="submit" id="btnCopiar">Copiar mensagem</button>
+          <span class="msg-done" id="msgFeito" role="status"></span>
+        </div>
+      </form>
+    </div>
+  </section>
+</main>
+
+<footer class="foot">
+  <div class="wrap">
+    <p><strong>Site conceito desenvolvido pela AVO.</strong> Não é o site oficial da Baliza Construtora. Dados de referência publicados pela construtora em nov/2026 (incorporação <span id="incorp">R-5/116.632</span>).</p>
+    <p>A divisão em 2 torres de 12 andares com 12 apartamentos por andar foi estimada pelas imagens públicas do empreendimento. A disponibilidade é ilustrativa e as imagens 3D são representações artísticas.</p>
+  </div>
+</footer>
+
+<!-- visita 3D do apartamento -->
+<div class="tour" id="tour" role="dialog" aria-modal="true" aria-labelledby="tourTitulo" hidden>
+  <div class="tour-bar">
+    <p class="tour-title"><strong id="tourTitulo">Apartamento</strong><span id="tourSub"></span></p>
+    <a class="chip" id="tourAbrir" href="apartamento/index.html" target="_blank" rel="noopener">Abrir em tela cheia</a>
+    <button class="btn btn-ink" id="tourFechar" type="button">Fechar</button>
+  </div>
+  <iframe id="tourFrame" title="Apartamento em 3D" allow="fullscreen"></iframe>
+</div>
+
+<script>window.__libFail = false;</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" onerror="window.__libFail=true"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js" onerror="window.__libFail=true"></script>
+<script src="js/dados.js"></script>
+<script src="js/predio3d.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

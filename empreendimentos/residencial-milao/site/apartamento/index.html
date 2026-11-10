@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Milão Sem Sacada 3D</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style>
+<link rel="stylesheet" href="estilo.css">
+</head>
+<body>
+<div class="app" id="app">
+  <div id="stage"><canvas id="c" tabindex="0" aria-label="Modelo 3D interativo do apartamento sem sacada. Arraste para girar."></canvas></div>
+  <div class="labels" id="labels"></div>
+  <div class="crosshair" id="crosshair" hidden></div>
+
+  <div class="ui">
+    <header class="title card">
+      <p class="eyebrow">Residencial Milão · São Leopoldo/RS</p>
+      <h1>Apartamento sem sacada</h1>
+      <dl class="facts">
+        <div><dt>Área privativa</dt><dd>47,08 m²</dd></div>
+        <div><dt>Dormitórios</dt><dd>2</dd></div>
+        <div><dt>Pé-direito</dt><dd>2,50 m*</dd></div>
+      </dl>
+    </header>
+
+    <div class="visit card" id="visitBar" hidden>
+      <p><small id="hudMode">Visitando</small><strong id="visitName">Circulação</strong></p>
+      <div class="btns">
+        <button class="btn btn-stand" id="standBtn" type="button" hidden>Levantar</button>
+        <button class="btn btn-exit" id="exitVisit" type="button">Sair</button>
+      </div>
+    </div>
+
+    <details class="rooms card" id="rooms">
+      <summary>Cômodos <span class="mono">40,54 m²</span></summary>
+      <ul id="roomList"></ul>
+      <p class="note">Toque num cômodo para entrar nele. Na visita, toque nos objetos para usar: portas, armários, geladeira, janelas, persianas (parte de cima da janela), interruptores e luzes, TVs, ar-condicionado, videogame, torneiras, chuveiro, fogão, privada (tampa e descarga), pisca-pisca da árvore de Natal, camas e sofá. A vista é do 5º andar, num dia de sol. *Pé-direito e altura das janelas são estimados; a planta não informa.</p>
+    </details>
+
+    <nav class="dock card" id="dock" aria-label="Controles da maquete">
+      <div class="dock-row">
+        <div class="seg" role="group" aria-label="Vista">
+          <button class="btn" id="v3d" type="button" aria-pressed="true"><svg viewBox="0 0 16 16"><path d="M8 1.8 14 5v6l-6 3.2L2 11V5z"/><path d="M2 5l6 3.2L14 5M8 8.2v6"/></svg>3D</button>
+          <button class="btn" id="vTop" type="button" aria-pressed="false"><svg viewBox="0 0 16 16"><rect x="2" y="2" width="12" height="12" rx="1"/><path d="M2 8.5h6V2M8 11.5v2.5M11 8.5h3"/></svg>Planta</button>
+          <button class="btn" id="vVisit" type="button" aria-pressed="false"><svg viewBox="0 0 16 16"><circle cx="9" cy="2.8" r="1.4"/><path d="M8.6 5.6 7.2 9.6l2.4 1.6V15M7.2 9.6 5.3 15M8.6 5.6l2.8 2.4M8.6 5.6 5.6 7.6"/></svg>Visitar</button>
+          <button class="btn" id="vFree" type="button" aria-pressed="false"><svg viewBox="0 0 16 16"><path d="M8 1.5v13M1.5 8h13M8 1.5 6.2 3.3M8 1.5l1.8 1.8M8 14.5l-1.8-1.8M8 14.5l1.8-1.8M1.5 8l1.8-1.8M1.5 8l1.8 1.8M14.5 8l-1.8-1.8M14.5 8l-1.8 1.8"/></svg>Câmera livre</button>
+        </div>
+        <div class="toggles">
+          <button class="btn toggle" id="tRotate" type="button" aria-pressed="true"><span class="dot"></span>Girar</button>
+          <button class="btn toggle" id="tWalls" type="button" aria-pressed="false"><span class="dot"></span>Paredes baixas</button>
+          <button class="btn toggle" id="tFurn" type="button" aria-pressed="true"><span class="dot"></span>Móveis</button>
+          <button class="btn toggle" id="tLabels" type="button" aria-pressed="true"><span class="dot"></span>Nomes</button>
+          <button class="btn toggle" id="tDoors" type="button" aria-pressed="true"><span class="dot"></span>Portas abertas</button>
+          <button class="btn toggle" id="tOverlay" type="button" aria-pressed="false"><span class="dot"></span>Sobrepor planta</button>
+        </div>
+      </div>
+      <p class="hint" id="hint">Arraste para girar 360° · role para aproximar · botão direito move a maquete</p>
+    </nav>
+  </div>
+
+  <div class="touch" id="touch" hidden>
+    <div class="joy" id="joy" role="img" aria-label="Joystick: arraste para andar"><div class="knob" id="knob"></div></div>
+    <div class="updown" id="updown">
+      <button type="button" id="btnUp" aria-label="Subir"><svg viewBox="0 0 24 24"><path d="M6 15l6-6 6 6"/></svg></button>
+      <button type="button" id="btnDown" aria-label="Descer"><svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></button>
+    </div>
+  </div>
+  <div class="tip" id="tip" hidden></div>
+
+  <div class="loading" id="loading"><span>Montando o apartamento…</span></div>
+  <div class="error card" id="err" hidden><strong>O 3D não pôde ser iniciado.</strong>Este navegador bloqueou o WebGL ou não baixou a biblioteca 3D. Recarregue a página; se continuar, abra em outro navegador.</div>
+</div>
+
+<script>window.__aptLibFail = false;</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" onerror="window.__aptLibFail=true"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js" onerror="window.__aptLibFail=true"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/objects/Reflector.js"></script>
+<script src="planta-dados.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

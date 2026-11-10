@@ -103,27 +103,46 @@
   $('btnVoltar').addEventListener('click', fecharAndar);
   $('btnHome').addEventListener('click', function () { if (apto) return; if (state.andar) fecharAndar(); else if (predio) predio.home(); });
 
-  // planta do andar em SVG: frente (entrada) embaixo, fundos em cima; 10 px por metro
+  // planta do andar em SVG: frente (entrada) embaixo, fundos em cima; 10 px por metro.
+  // Cada apartamento mostra a planta oficial (com ou sem sacada) virada como no prédio:
+  // disponível fica clara, reservado amarelado e vendido apagado.
+  const miniaturas = {};
+  ['sem-sacada', 'com-sacada'].forEach(function (tipo) {
+    Predio3D.planCanvas(tipo, function (c) {
+      if (!c) return;
+      try {
+        const m = document.createElement('canvas'); m.width = Math.round(c.width / 2); m.height = Math.round(c.height / 2);
+        m.getContext('2d').drawImage(c, 0, 0, m.width, m.height);
+        miniaturas[tipo] = m.toDataURL('image/png');
+      } catch (e) { return; }
+      if (state.andar) renderPlanta();
+    });
+  });
   function renderPlanta() {
-    const S = 10, X = function (x) { return (x + 27) * S; }, Y = function (z) { return (z + 7.5) * S; };
-    const R = Predio3D.unitRect;
-    let svg = '<rect class="pl-slab" x="0" y="0" width="540" height="150" rx="3"/>';
-    [[-1.8, 1.8, 0.9, 7.5], [-1.8, 1.8, -7.5, -0.9], [-18, -15.8, 0.9, 7.3], [-18, -15.8, -7.3, -0.9], [15.8, 18, 0.9, 7.3], [15.8, 18, -7.3, -0.9]].forEach(function (c) {
+    const S = 10, HLm = Predio3D.L / 2, X = function (x) { return (x + HLm) * S; }, Y = function (z) { return (z + 7.5) * S; };
+    const R = Predio3D.unitRect, W = Predio3D.L * S;
+    let svg = '<rect class="pl-slab" x="0" y="0" width="' + W + '" height="150" rx="3"/>';
+    const nucleos = [[-1.8, 1.8, 0.9, 7.5], [-1.8, 1.8, -7.5, -0.9]];
+    Predio3D.BAYS.forEach(function (b) { if (b[0] === 'faixa') { nucleos.push([b[1], b[2], 0.9, 7.3], [b[1], b[2], -7.3, -0.9]); } });
+    nucleos.forEach(function (c) {
       svg += '<rect class="pl-core" x="' + X(c[0]) + '" y="' + Y(c[2]) + '" width="' + (c[1] - c[0]) * S + '" height="' + (c[3] - c[2]) * S + '" rx="2"/>';
     });
-    svg += '<text class="pl-txt" x="270" y="-12" text-anchor="middle">Fundos</text>';
-    svg += '<text class="pl-txt" x="270" y="180" text-anchor="middle">Frente · entrada</text>';
+    svg += '<text class="pl-txt" x="' + W / 2 + '" y="-12" text-anchor="middle">Fundos</text>';
+    svg += '<text class="pl-txt" x="' + W / 2 + '" y="180" text-anchor="middle">Frente · entrada</text>';
     for (let p = 1; p <= 12; p++) {
-      const r = R(p), u = info(state.torre, state.andar, p), dim = !matches(p);
+      const r = R(p), u = info(state.torre, state.andar, p), dim = !matches(p), pose = Predio3D.planPose(p);
       const x = X(r.x0) + 1, w = (r.x1 - r.x0) * S - 2, y = Y(r.z0) + 1, h = (r.z1 - r.z0) * S - 2;
-      let balc = '';
-      if (r.canto) {
-        const bx = r.k === 1 ? X(-27) : X(27 - Predio3D.LOGGIA), by = r.front ? 150 : -9;
-        balc = '<rect x="' + (bx + 2) + '" y="' + by + '" width="' + (Predio3D.LOGGIA * S - 4) + '" height="9" rx="2"/>';
-      }
+      const cx = x + w / 2, cy = y + h / 2;
+      const tf = pose.front ? (pose.mirror ? 'matrix(1,0,0,-1,0,' + 2 * cy + ')' : 'matrix(-1,0,0,-1,' + 2 * cx + ',' + 2 * cy + ')')
+        : (pose.mirror ? 'matrix(-1,0,0,1,' + 2 * cx + ',0)' : '');
+      const img = miniaturas[u.tipo] ? '<image href="' + miniaturas[u.tipo] + '" x="' + (x + 1.5) + '" y="' + (y + 1.5) + '" width="' + (w - 3) + '" height="' + (h - 3) + '" preserveAspectRatio="none"' + (tf ? ' transform="' + tf + '"' : '') + '/>' : '';
+      const ny = pose.front ? y + h - 15 : y + 3, nw = 36;
       svg += '<g class="pl-u is-' + u.status + (dim ? ' is-dim' : '') + (p === state.pos ? ' is-on' : '') + '" data-pos="' + p + '" tabindex="0" role="button" aria-label="Apartamento ' + u.num + ', ' + u.T.nome.toLowerCase() + ', ' + STATUS_TXT[u.status].toLowerCase() + '">' +
-        balc + '<rect x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '" rx="4"/>' +
-        '<text x="' + (x + w / 2) + '" y="' + (y + h / 2 + 4.5) + '" text-anchor="middle">' + u.num + '</text></g>';
+        '<rect class="pl-base" x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '" rx="3"/>' + img +
+        '<rect class="pl-tint" x="' + (x + 1.5) + '" y="' + (y + 1.5) + '" width="' + (w - 3) + '" height="' + (h - 3) + '"/>' +
+        '<rect class="pl-frame" x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '" rx="3"/>' +
+        '<rect class="pl-tag" x="' + (cx - nw / 2) + '" y="' + ny + '" width="' + nw + '" height="13" rx="3"/>' +
+        '<text x="' + cx + '" y="' + (ny + 10) + '" text-anchor="middle">' + u.num + '</text></g>';
     }
     $('planta').innerHTML = svg;
   }

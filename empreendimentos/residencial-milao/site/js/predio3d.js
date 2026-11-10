@@ -11,19 +11,20 @@
   const FH = 2.84;                 // piso a piso
   const FLOORS = 12;               // andares acima do térreo
   const LEVELS = FLOORS + 1;       // térreo + andares
-  const L = 54, D = 15, HL = L / 2, HD = D / 2;
+  const L = 53.2, D = 15, HL = L / 2, HD = D / 2;
   const TOP = LEVELS * FH;         // laje de cobertura
   const CROWN = 1.3, CORE_UP = 3.8, CORE_W = 3.6, CORE_D = 6;
   const PXM = 38;                  // pixels por metro nas texturas de fachada
   const ROW = Math.round(FH * PXM);
 
-  // trechos da fachada comprida, da esquerda (-x) para a direita (+x)
+  // trechos da fachada comprida, da esquerda (-x) para a direita (+x); larguras tiradas das plantas oficiais:
+  // apto de canto (com sacada) 7,7 m, apto de meio (sem sacada) 7,8 m, poço de ventilação 1,5 m, núcleo de elevadores e escada 3,6 m
   const BAYS = [
-    ['canto', -27, -18, 'L'], ['faixa', -18, -15.8], ['meio', -15.8, -8.8], ['meio', -8.8, -1.8],
-    ['nucleo', -1.8, 1.8], ['meio', 1.8, 8.8], ['meio', 8.8, 15.8], ['faixa', 15.8, 18], ['canto', 18, 27, 'R']
+    ['canto', -26.6, -18.9, 'L'], ['faixa', -18.9, -17.4], ['meio', -17.4, -9.6, 'L'], ['meio', -9.6, -1.8, 'L'],
+    ['nucleo', -1.8, 1.8], ['meio', 1.8, 9.6, 'L'], ['meio', 9.6, 17.4, 'L'], ['faixa', 17.4, 18.9], ['canto', 18.9, 26.6, 'R']
   ];
-  const UNIT_X = { 1: [-27, -18], 2: [-15.8, -8.8], 3: [-8.8, -1.8], 4: [1.8, 8.8], 5: [8.8, 15.8], 6: [18, 27] };
-  const LOGGIA = 2.6;              // largura da sacada nos aptos de canto
+  const UNIT_X = { 1: [-26.6, -18.9], 2: [-17.4, -9.6], 3: [-9.6, -1.8], 4: [1.8, 9.6], 5: [9.6, 17.4], 6: [18.9, 26.6] };
+  const LOGGIA = 2.4, LOGGIA_IN = 0.1;   // sacada do apto de canto (2,36 m na planta), a 10 cm da ponta
 
   // posição no andar (1–12) -> retângulo em planta, no sistema da torre
   function unitRect(pos) {
@@ -55,9 +56,10 @@
 
   function windowsOf(bay) {
     const t = bay[0], a = bay[1];
-    if (t === 'meio') return [[a + 1.5, 1.2], [a + 3.7, 1.2], [a + 5.6, 1.6]];
-    if (t === 'canto' && bay[3] === 'L') return [[a + 3.5, 1.6], [a + 5.9, 1.2], [a + 7.9, 1.2]];
-    if (t === 'canto') return [[a + 5.5, 1.6], [a + 3.1, 1.2], [a + 1.1, 1.2]];
+    const z = bay[2];
+    if (t === 'meio') return [[a + 1.35, 1.5], [a + 3.89, 1.2], [a + 6.44, 1.2]];                       // sala, dorm. 2, dorm. 1
+    if (t === 'canto' && bay[3] === 'L') return [[a + 3.8, 1.24], [a + 6.3, 1.25]];                     // dorm. 2, dorm. 1 (a sacada fica na ponta)
+    if (t === 'canto') return [[z - 3.8, 1.24], [z - 6.3, 1.25]];
     return [];
   }
 
@@ -100,7 +102,7 @@
           return;
         }
         if (b[0] === 'canto' && lv > 0) {                    // sacada recuada com guarda-corpo de vidro
-          const lx0 = b[3] === 'L' ? b[1] : b[2] - LOGGIA, lx1 = lx0 + LOGGIA;
+          const lx0 = b[3] === 'L' ? b[1] + LOGGIA_IN : b[2] - LOGGIA_IN - LOGGIA, lx1 = lx0 + LOGGIA;
           g.fillStyle = C.loggia; g.fillRect(rx(lx0) + 2, ry(2.55), (lx1 - lx0) * PXM - 4, 2.4 * PXM);
           const door = rx(lx0) + 0.35 * PXM, dw = (LOGGIA - 0.7) * PXM;
           drawWindow(g, wins, door, ry(2.2), dw, 2.0 * PXM, { lv: lv, b: b, kind: 'unit' });
@@ -181,6 +183,35 @@
     g.fillStyle = C.graphite; g.fillRect(6.8 * PXM, 0, 1.6 * PXM, H);
     g.fillStyle = 'rgba(255,255,255,.18)'; g.fillRect(0, 0, W, 3);
     return c;
+  }
+
+  /* ---------------- plantas oficiais recortadas pelo contorno do apartamento ---------------- */
+  // usa os dados das plantas da maquete (apartamento/planta-*.js): imagem, contorno e origem em px
+  const planCache = {};
+  function planCanvas(tipo, cb) {
+    const P = window.PLANS && window.PLANS[tipo];
+    if (!P || typeof Image === 'undefined') { cb(null); return; }
+    const ent = planCache[tipo];
+    if (ent) { if (ent.c || ent.fail) cb(ent.c); else ent.wait.push(cb); return; }
+    const e = planCache[tipo] = { c: null, fail: false, wait: [cb] };
+    const img = new Image();
+    img.onload = function () {
+      const ox = P.origin[0], oy = P.origin[1], w = P.extent[0] - ox, h = P.extent[1] - oy;
+      const c = canvas(w, h), g = c.getContext('2d');
+      g.beginPath();
+      P.outline.forEach(function (p, i) { if (i) g.lineTo(p[0] - ox, p[1] - oy); else g.moveTo(p[0] - ox, p[1] - oy); });
+      g.closePath(); g.clip();
+      g.drawImage(img, -ox, -oy);
+      e.c = c; e.wait.splice(0).forEach(function (f) { f(c); });
+    };
+    img.onerror = function () { e.fail = true; e.wait.splice(0).forEach(function (f) { f(null); }); };
+    img.src = 'apartamento/' + P.meta.img;
+  }
+  // como a planta é vista de cima em cada posição: a fachada (topo da imagem) fica para fora e, nos aptos de canto,
+  // a sacada fica na ponta do prédio (dois dos quatro cantos são o espelho da planta); os de meio só giram, sem espelhar
+  function planPose(pos) {
+    const r = unitRect(pos), cx = (r.x0 + r.x1) / 2;
+    return { front: r.front, mirror: r.canto && (r.front ? cx > 0 : cx < 0) };
   }
 
   /* ---------------- terreno do condomínio ---------------- */
@@ -384,7 +415,8 @@
       const balcRail = new THREE.InstancedMesh(new THREE.BoxGeometry(LOGGIA, 0.05, 0.06), M.rail, nb);
       let k = 0;
       for (let f = 1; f <= FLOORS; f++) {
-        [[-HL + LOGGIA / 2, 1], [HL - LOGGIA / 2, 1], [-HL + LOGGIA / 2, -1], [HL - LOGGIA / 2, -1]].forEach(function (b) {
+        const bxL = -HL + LOGGIA_IN + LOGGIA / 2, bxR = HL - LOGGIA_IN - LOGGIA / 2;
+        [[bxL, 1], [bxR, 1], [bxL, -1], [bxR, -1]].forEach(function (b) {
           const y = f * FH, zs = b[1] * (HD + 0.12);
           dm.rotation.set(0, b[1] > 0 ? 0 : Math.PI, 0);
           dm.position.set(b[0], y + 0.02, zs); dm.updateMatrix(); balcSlab.setMatrixAt(k, dm.matrix);
@@ -515,6 +547,24 @@
       return unitMats[key];
     }
     const plateMats = { slab: std({ color: 0xE9EAEC }), corridor: std({ color: 0xF7F7F5 }), shaft: std({ color: 0x41464F }) };
+    const PLAN_TINT = { livre: 0xFFFFFF, reservado: 0xF4C84E, vendido: 0x2A2F3A };
+    const planTex = {}, planMats = {};
+    ['sem-sacada', 'com-sacada'].forEach(function (tipo) {
+      planCanvas(tipo, function (c) {
+        if (!c) return;
+        const t = tex(c); planTex[tipo] = t;
+        Object.keys(planMats).forEach(function (k) { if (k.indexOf(tipo) === 0) { planMats[k].map = t; planMats[k].needsUpdate = true; } });
+        dirty = true;
+      });
+    });
+    function planMat(tipo, st, dim) {
+      const key = tipo + '|' + st + (dim ? '|dim' : '');
+      if (!planMats[key]) {
+        planMats[key] = new THREE.MeshBasicMaterial({ map: planTex[tipo] || null, color: lin(PLAN_TINT[st]), transparent: true, alphaTest: 0.02,
+          opacity: dim ? 0.25 : 1, depthWrite: !dim, side: THREE.DoubleSide, toneMapped: false });
+      }
+      return planMats[key];
+    }
     let sel = null;            // { torre, andar }
     let filterType = 'todos';
     let hoverUnit = null, selUnit = null;
@@ -534,22 +584,25 @@
       b(plateMats.slab, L, 0.24, D, 0, y + 0.12, 0);
       b(plateMats.corridor, L - 0.4, 0.04, 1.6, 0, y + 0.26, 0);
       [-1, 1].forEach(function (s) {
-        b(plateMats.shaft, CORE_W, FH, 5.9, 0, y + FH / 2, s * 4.05);              // elevadores (frente) e escada (fundos)
-        b(plateMats.shaft, 2.2, FH * 0.9, 6.4, -16.9, y + FH * 0.45, s * 4.1);     // prumadas de serviço
-        b(plateMats.shaft, 2.2, FH * 0.9, 6.4, 16.9, y + FH * 0.45, s * 4.1);
+        b(plateMats.shaft, CORE_W, FH * 0.55, 5.9, 0, y + FH * 0.275, s * 4.05);   // elevadores (frente) e escada (fundos)
+        b(plateMats.shaft, 1.5, FH * 0.45, 6.4, -18.15, y + FH * 0.225, s * 4.1);  // poços de ventilação
+        b(plateMats.shaft, 1.5, FH * 0.45, 6.4, 18.15, y + FH * 0.225, s * 4.1);
       });
       tw.units = [];
       for (let pos = 1; pos <= 12; pos++) {
-        const r = unitRect(pos), st = statusOf(tw.T.id, andar, pos), tp = typeOf(pos);
+        const r = unitRect(pos), st = statusOf(tw.T.id, andar, pos), tp = typeOf(pos), pose = planPose(pos);
         const dim = filterType !== 'todos' && tp !== filterType;
-        const w = r.x1 - r.x0 - 0.24, d = r.z1 - r.z0 - 0.24;
-        const m = b(unitMat(st, dim), w, 1.25, d, (r.x0 + r.x1) / 2, y + 0.24 + 0.625, (r.z0 + r.z1) / 2);
-        m.userData = { unit: pos, torre: tw.T.id, andar: andar, status: st, tipo: tp, baseY: m.position.y };
-        if (r.canto) {                                       // sacada do apto de canto
-          const bx = r.k === 1 ? -HL + LOGGIA / 2 : HL - LOGGIA / 2, bz = r.front ? HD + 0.45 : -HD - 0.45;
-          b(unitMat(st, dim), LOGGIA - 0.2, 0.5, 0.7, bx, y + 0.24 + 0.25, bz);
-        }
-        tw.units.push(m);
+        const w = r.x1 - r.x0 - 0.08, d = r.z1 - r.z0 - 0.08;
+        const ug = new THREE.Group(); ug.position.set((r.x0 + r.x1) / 2, y + 0.3, (r.z0 + r.z1) / 2); g.add(ug);
+        const base = new THREE.Mesh(new THREE.BoxGeometry(w, 0.12, d), unitMat(st, dim)); base.position.y = -0.05; base.receiveShadow = true; ug.add(base);
+        const wrap = new THREE.Group(); if (pose.front) wrap.rotation.y = Math.PI; ug.add(wrap);
+        const plan = new THREE.Mesh(new THREE.PlaneGeometry(w, d), planMat(tp, st, dim));
+        plan.rotation.x = -Math.PI / 2; plan.position.y = 0.016; if (pose.mirror) plan.scale.x = -1; plan.renderOrder = 2;
+        wrap.add(plan);
+        const info = { unit: pos, torre: tw.T.id, andar: andar, status: st, tipo: tp, dim: dim, baseY: ug.position.y, base: base, plan: plan,
+          front: r.front, half: d / 2 };
+        base.userData = info; plan.userData = info; ug.userData = info;
+        tw.units.push(ug);
       }
     }
 
@@ -604,10 +657,10 @@
       removeUnitPickables();
       if (sel) {
         const tw = towers[sel.torre];
-        tw.units.forEach(function (m) { if (m.material.opacity === 1) pickables.push(m); });
-        setLabels(tw.units.map(function (m) {
-          const u = m.userData;
-          return { pos: u.unit, num: String(sel.andar * 100 + u.unit), status: u.status, dim: m.material.opacity < 1, p: new THREE.Vector3(tw.T.x + m.position.x, m.position.y + 1.3, tw.T.z + m.position.z) };
+        tw.units.forEach(function (ug) { if (!ug.userData.dim) { pickables.push(ug.userData.base); pickables.push(ug.userData.plan); } });
+        setLabels(tw.units.map(function (ug) {
+          const u = ug.userData, edge = u.front ? u.half - 0.7 : -u.half + 0.7;      // número perto da fachada, para não cobrir a planta
+          return { pos: u.unit, num: String(sel.andar * 100 + u.unit), status: u.status, dim: u.dim, p: new THREE.Vector3(tw.T.x + ug.position.x, ug.position.y + 0.3, tw.T.z + ug.position.z + edge) };
         }));
         refreshUnitLook();
       } else {
@@ -618,10 +671,10 @@
 
     function refreshUnitLook() {
       if (!sel) return;
-      towers[sel.torre].units.forEach(function (m) {
-        const on = m.userData.unit === selUnit, hv = m.userData.unit === hoverUnit;
-        m.position.y = m.userData.baseY + (on ? 0.55 : hv ? 0.28 : 0);
-        m.scale.y = on ? 1.35 : 1;
+      towers[sel.torre].units.forEach(function (ug) {
+        const on = ug.userData.unit === selUnit, hv = ug.userData.unit === hoverUnit;
+        ug.position.y = ug.userData.baseY + (on ? 0.7 : hv ? 0.32 : 0);
+        ug.userData.base.scale.y = on ? 2.2 : 1;
       });
       labelEls.forEach(function (l, i) { l.el.classList.toggle('is-on', !!sel && (i + 1) === selUnit); });
       dirty = true;
@@ -642,7 +695,7 @@
     function goHome(ms) { flyTo(HOME.target, spherical(HOME.target, fitR(HOME.r), HOME.phi, HOME.theta), ms); }
     function goFloor(torre, andar, ms) {
       const T = towers[torre].T, tgt = new THREE.Vector3(T.x, andar * FH + 0.8, T.z);
-      flyTo(tgt, spherical(tgt, fitR(80), 0.86, currentTheta()), ms);
+      flyTo(tgt, spherical(tgt, fitR(70), 0.55, currentTheta()), ms);
     }
 
     /* ---------------- tema: dia (claro) e noite (escuro) ---------------- */
@@ -788,9 +841,9 @@
       },
       setPaused: function (p) { paused = !!p; dirty = true; },
       interacted: function () { return interacted; },
-      FH: FH, unitRect: unitRect, L: L, D: D, LOGGIA: LOGGIA
+      FH: FH, unitRect: unitRect, L: L, D: D
     };
   }
 
-  window.Predio3D = { create: create, unitRect: unitRect, FH: FH, L: L, D: D, LOGGIA: LOGGIA };
+  window.Predio3D = { create: create, unitRect: unitRect, planCanvas: planCanvas, planPose: planPose, BAYS: BAYS, FH: FH, L: L, D: D };
 })();

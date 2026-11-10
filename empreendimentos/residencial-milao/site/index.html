@@ -58,6 +58,17 @@
         <p class="stage-hint" id="stageHint">Arraste para girar · role ou faça pinça para aproximar · toque num andar</p>
         <div class="tip" id="tip" hidden></div>
         <div class="loading" id="loading"><span>Montando as torres…</span></div>
+        <div class="apt-layer" id="aptLayer" hidden>
+          <iframe id="aptFrame" title="Apartamento em 3D" allow="fullscreen"></iframe>
+          <div class="curtain" id="curtain" aria-live="polite">
+            <div class="curtain-in">
+              <p class="eyebrow" id="curtainSub">Torre A · 8º andar</p>
+              <p class="curtain-title" id="curtainTitle">Apto 803</p>
+              <span class="curtain-bar" aria-hidden="true"></span>
+              <p class="curtain-msg" id="curtainMsg">Entrando no apartamento…</p>
+            </div>
+          </div>
+        </div>
         <div class="stage-error" id="stageError" hidden>
           <strong>O 3D não abriu neste navegador.</strong>
           Ele precisa de WebGL. Você ainda pode escolher o andar e o apartamento pelo painel ao lado.
@@ -106,6 +117,37 @@
         </div>
         <div class="unit" id="unidade">
           <p class="unit-empty">Toque num apartamento na planta ou no prédio.</p>
+        </div>
+      </div>
+
+      <!-- visita ao apartamento (a maquete fica no palco ao lado) -->
+      <div class="view" id="viewApto" hidden>
+        <div class="floor-head">
+          <button class="back" id="btnSairApto" type="button">
+            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10 3 5 8l5 5"/></svg><span id="voltarRotulo">Andar</span>
+          </button>
+          <p class="floor-title"><span id="aptoTitulo">Apartamento</span><small id="aptoSub"></small></p>
+        </div>
+        <div class="seg seg-full" role="group" aria-label="Vista do apartamento">
+          <button type="button" class="seg-btn" data-cmd="v3d" aria-pressed="true">3D</button>
+          <button type="button" class="seg-btn" data-cmd="vTop" aria-pressed="false">Planta</button>
+          <button type="button" class="seg-btn" data-cmd="vVisit" aria-pressed="false">Visitar</button>
+          <button type="button" class="seg-btn" data-cmd="vFree" aria-pressed="false">Voar</button>
+        </div>
+        <div class="toggles" role="group" aria-label="Opções da maquete">
+          <button type="button" class="tgl" data-cmd="tRotate" aria-pressed="true">Girar</button>
+          <button type="button" class="tgl" data-cmd="tWalls" aria-pressed="false">Paredes baixas</button>
+          <button type="button" class="tgl" data-cmd="tFurn" aria-pressed="true">Móveis</button>
+          <button type="button" class="tgl" data-cmd="tLabels" aria-pressed="true">Nomes</button>
+          <button type="button" class="tgl" data-cmd="tDoors" aria-pressed="true">Portas abertas</button>
+          <button type="button" class="tgl" data-cmd="tOverlay" aria-pressed="false">Planta oficial</button>
+        </div>
+        <p class="panel-title">Cômodos · <span id="aptoTotal">—</span></p>
+        <ul class="room-list" id="aptoComodos"><li class="unit-empty">Carregando os cômodos…</li></ul>
+        <p class="unit-note" id="aptoDica">Toque num cômodo para entrar nele. Na visita, clique nas portas, luzes e interruptores, janelas e persianas, TVs, ar-condicionado, torneiras, chuveiro, fogão, privada, camas e sofá.</p>
+        <div class="unit-actions">
+          <button class="btn btn-line" id="btnTelaCheia" type="button">Tela cheia</button>
+          <button class="btn btn-gold" id="btnInteresseApto" type="button">Tenho interesse</button>
         </div>
       </div>
 
@@ -204,16 +246,6 @@
     <p>A divisão em 2 torres de 12 andares com 12 apartamentos por andar foi estimada pelas imagens públicas do empreendimento. A disponibilidade é ilustrativa e as imagens 3D são representações artísticas.</p>
   </div>
 </footer>
-
-<!-- visita 3D do apartamento -->
-<div class="tour" id="tour" role="dialog" aria-modal="true" aria-labelledby="tourTitulo" hidden>
-  <div class="tour-bar">
-    <p class="tour-title"><strong id="tourTitulo">Apartamento</strong><span id="tourSub"></span></p>
-    <a class="chip" id="tourAbrir" href="apartamento/index.html" target="_blank" rel="noopener">Abrir em tela cheia</a>
-    <button class="btn btn-ink" id="tourFechar" type="button">Fechar</button>
-  </div>
-  <iframe id="tourFrame" title="Apartamento em 3D" allow="fullscreen"></iframe>
-</div>
 
 <script>window.__libFail = false;</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" onerror="window.__libFail=true"></script>

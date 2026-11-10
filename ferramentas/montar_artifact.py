@@ -41,6 +41,28 @@ def checar_js(pasta: Path) -> None:
     print('sintaxe dos scripts: ok')
 
 
+def testar(site: Path) -> None:
+    """Roda o teste de fumaça nas páginas do site (e nas duas plantas da maquete, se houver)."""
+    if not shutil.which('node'):
+        return
+    teste = RAIZ / 'ferramentas' / 'teste_fumaca.js'
+    casos = [(site / 'index.html', '')]
+    roteiro = RAIZ / 'ferramentas' / 'roteiros' / (site.parent.name.replace('residencial-', '') + '-site.js')
+    apto = site / 'apartamento' / 'index.html'
+    if apto.exists():
+        for plano in sorted((site / 'apartamento').glob('planta-*.js')):
+            tipo = plano.stem.replace('planta-', '')
+            casos.append((apto, f'#tipo={tipo}&embed=1&andar=8'))
+    for pagina, hash_ in casos:
+        args = ['node', str(teste), str(pagina), hash_, '6']
+        if pagina == site / 'index.html' and roteiro.exists():
+            args.append(str(roteiro))
+        r = subprocess.run(args, capture_output=True, text=True)
+        if r.returncode:
+            sys.exit(f'teste de fumaça falhou em {pagina.relative_to(RAIZ)}{hash_}:\n{r.stdout}{r.stderr}')
+    print(f'teste de fumaça: ok ({len(casos)} páginas)')
+
+
 def main() -> None:
     if len(sys.argv) != 2:
         sys.exit(__doc__)
@@ -49,6 +71,7 @@ def main() -> None:
     if not (site / 'index.html').exists():
         sys.exit(f'não achei {site / "index.html"}')
     checar_js(site)
+    testar(site)
     destino = RAIZ / 'dist' / nome
     if destino.exists():
         shutil.rmtree(destino)

@@ -33,9 +33,10 @@
     return { x0: x[0], x1: x[1], z0: front ? 0.8 : -HD, z1: front ? HD : -0.8, front: front, canto: k === 1 || k === 6, k: k };
   }
 
+  // as duas torres ficam em linha, uma ao lado da outra, de frente para a rua (a B um pouco recuada), como nas fotos aéreas
   const TOWERS = [
-    { id: 'A', x: 12, z: 10 },
-    { id: 'B', x: -14, z: -26 }
+    { id: 'A', x: -30, z: 0 },
+    { id: 'B', x: 31, z: -3 }
   ];
 
   const C = {
@@ -134,10 +135,9 @@
       g.fillStyle = (lv % 2) ? C.light : C.light2; g.fillRect(0, y0, W, ROW);
       g.fillStyle = C.graphite; g.fillRect(rx(6.7), y0, rx(1.6), ROW);
       if (lv === 0) { g.fillStyle = C.graphite; g.fillRect(0, ry(0.55), W, 0.55 * PXM); }
-      [2.2, 4.7, 10.3, 12.8].forEach(function (cx, wi) {
-        const w = 1.2 * PXM, h = 1.15 * PXM, x = rx(cx) - w / 2, y = ry(2.2);
-        if (((wi * 3 + lv * 2) % 4) === 0) { g.fillStyle = C.navy; g.fillRect(x + w + 2, y - 0.15 * PXM, 0.85 * PXM, h + 0.3 * PXM); }
-        drawWindow(g, e, x, y, w, h, R() < 0.45, 'rgba(255,214,160,.9)');
+      // ponta do prédio: a parede da sala do apto de canto é cega (sem janelas, como na planta); só os painéis azuis da fachada
+      [3.6, 11.4].forEach(function (cx, wi) {
+        if (((wi + lv) % 3) === 0) { g.fillStyle = C.navy; g.fillRect(rx(cx) - 0.45 * PXM, ry(2.35), 0.9 * PXM, 1.45 * PXM); }
       });
       drawWindow(g, e, rx(7.5) - 0.3 * PXM, ry(2.05), 0.6 * PXM, 0.65 * PXM, R() < 0.4, 'rgba(255,230,190,.85)');
       g.fillStyle = C.slab; g.fillRect(0, y0 + ROW - 3, W, 3);
@@ -164,15 +164,15 @@
 
   /* ---------------- terreno do condomínio ---------------- */
 
-  const SITE = { x0: -62, x1: 62, z0: -58, z1: 46 };
+  const SITE = { x0: -72, x1: 72, z0: -60, z1: 44 };
   const SITE_PX = 16;
   const AREAS = {
     lawn: '#8EAA6C', paving: '#CFCBC2', asphalt: '#5D6067', deck: '#DCCFB8', rubber: '#C46F52', walk: '#E2DED6'
   };
-  const PARKING = [                                  // [x0, z0, x1, z1, direção das vagas]
-    [-58, 24, -20, 44, 'z'], [-60, -14, -46, 18, 'x'], [-40, -56, 18, -40, 'z'], [46, -4, 60, 40, 'x']
+  const PARKING = [                                  // [x0, z0, x1, z1, direção das vagas]: estacionamento descoberto na frente das torres
+    [-68, 18, 10, 40, 'z'], [30, 18, 68, 40, 'z'], [-68, -58, 4, -53, 'z']
   ];
-  const POOL = { deck: [20, -36, 44, -12], adult: [23, -30, 35, -23], kids: [37.5, -29, 41.5, -25] };
+  const POOL = { deck: [-56, -48, -22, -18], adult: [-51, -40, -39, -33], kids: [-34, -38, -30, -34] };
 
   function siteCanvas() {
     const W = (SITE.x1 - SITE.x0) * SITE_PX, H = (SITE.z1 - SITE.z0) * SITE_PX;
@@ -182,12 +182,11 @@
     rect(AREAS.lawn, SITE.x0, SITE.z0, SITE.x1, SITE.z1);
     const R = rng(77);
     for (let i = 0; i < 2600; i++) { g.fillStyle = R() < 0.5 ? 'rgba(60,90,40,.10)' : 'rgba(200,220,150,.10)'; g.fillRect(R() * W, R() * H, 3 + R() * 8, 2 + R() * 5); }
-    // vias internas
-    rect(AREAS.asphalt, -60, 18, 60, 24);
-    rect(AREAS.asphalt, 8, 24, 16, 46);
-    rect(AREAS.asphalt, -60, -40, -44, 24);
-    rect(AREAS.asphalt, -44, -40, 20, -36);
-    rect(AREAS.asphalt, 44, -6, 60, 18);
+    // vias internas: rua na frente das torres, acesso pela portaria e contorno pela ponta da torre A até o fundo
+    rect(AREAS.asphalt, -70, 12, 70, 18);
+    rect(AREAS.asphalt, 12, 18, 28, 44);
+    rect(AREAS.asphalt, -72, -53, -64, 18);
+    rect(AREAS.asphalt, -72, -53, 4, -48);
     // estacionamentos com vagas de 2,5 m
     PARKING.forEach(function (p) {
       rect(AREAS.asphalt, p[0], p[1], p[2], p[3]);
@@ -206,9 +205,10 @@
     TOWERS.forEach(function (t) { rect(AREAS.walk, t.x - HL - 2.2, t.z - HD - 2.2, t.x + HL + 2.2, t.z + HD + 2.2); });
     // lazer
     rect(AREAS.deck, POOL.deck[0], POOL.deck[1], POOL.deck[2], POOL.deck[3]);
-    rect(AREAS.rubber, 47, -32, 59, -18);
-    rect(AREAS.paving, -59, -54, -45, -42);
-    rect(AREAS.walk, -2, 38, 22, 46);
+    rect(AREAS.paving, -16, -36, 6, -20);
+    rect(AREAS.paving, 10, -50, 26, -36);
+    rect(AREAS.rubber, 32, -48, 44, -34);
+    rect(AREAS.walk, 2, 38, 34, 44);
     // muro do condomínio
     g.strokeStyle = 'rgba(40,44,52,.75)'; g.lineWidth = 4; g.strokeRect(X(SITE.x0) + 2, Z(SITE.z0) + 2, W - 4, H - 4);
     return c;
@@ -273,12 +273,12 @@
     sun.position.set(70, 120, 85); sun.target.position.set(-2, 0, -6);
     sun.castShadow = true;
     sun.shadow.mapSize.set(2048, 2048);
-    Object.assign(sun.shadow.camera, { left: -95, right: 95, top: 95, bottom: -95, near: 10, far: 360 });
+    Object.assign(sun.shadow.camera, { left: -110, right: 110, top: 110, bottom: -110, near: 10, far: 380 });
     sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.03;
     scene.add(sun); scene.add(sun.target);
     const amb = new THREE.AmbientLight(0x8090C0, 0); scene.add(amb);
     const lamps = [];
-    [[4, 40], [20, 40], [12, 22], [-30, 21], [30, 21], [32, -12], [-50, -20]].forEach(function (p) {
+    [[8, 40], [30, 40], [20, 20], [-30, 16], [31, 16], [-5, -24], [-40, -16], [18, -34]].forEach(function (p) {
       const l = new THREE.PointLight(0xFFC98A, 0, 26, 2); l.position.set(p[0], 4.2, p[1]); scene.add(l); lamps.push(l);
     });
 
@@ -395,18 +395,18 @@
       ng.fillText('MILÃO', 128, 300);
       const pillarFront = std({ map: tex(nameC), roughness: 0.95 });
       const pillar = new THREE.Mesh(new THREE.BoxGeometry(2.6, 6.2, 1.3), [concrete, concrete, concrete, concrete, pillarFront, concrete]);
-      pillar.position.set(4.6, 3.1, 44.4); pillar.castShadow = true; scene.add(pillar);
-      box(dark, 18, 0.35, 5.4, 13, 4.5, 41.6);                  // pórtico sobre a entrada
-      box(dark, 0.35, 4.5, 0.35, 21.8, 2.25, 43.9);
-      box(dark, 6, 3.2, 5, 25.2, 1.6, 41);                      // guarita
-      box(M.glass, 5.2, 1.6, 0.05, 25.2, 1.9, 43.52);
-      box(dark, 7, 0.25, 6, 25.2, 3.32, 41);
+      pillar.position.set(8.6, 3.1, 44.4); pillar.castShadow = true; scene.add(pillar);
+      box(dark, 18, 0.35, 5.4, 20, 4.5, 41.6);                  // pórtico sobre a entrada
+      box(dark, 0.35, 4.5, 0.35, 28.8, 2.25, 43.9);
+      box(dark, 6, 3.2, 5, 33.2, 1.6, 41);                      // guarita
+      box(M.glass, 5.2, 1.6, 0.05, 33.2, 1.9, 43.52);
+      box(dark, 7, 0.25, 6, 33.2, 3.32, 41);
       // salão de festas
-      box(white, 13, 4, 11, -52, 2, -48);
-      box(dark, 14, 0.3, 12, -52, 4.15, -48);
-      box(M.glass, 12, 2.6, 0.05, -52, 1.6, -42.45);
+      box(white, 14, 4, 12, 18, 2, -43);
+      box(dark, 15, 0.3, 13, 18, 4.15, -43);
+      box(M.glass, 13, 2.6, 0.05, 18, 1.6, -36.95);
       // quiosques com churrasqueira
-      [[24, -15.5], [33, -15.5]].forEach(function (p) {
+      [[-10, -28], [0, -28]].forEach(function (p) {
         box(dark, 5, 0.25, 4.4, p[0], 3.1, p[1]);
         [[-2.2, -1.9], [2.2, -1.9], [-2.2, 1.9], [2.2, 1.9]].forEach(function (c) { box(white, 0.22, 3, 0.22, p[0] + c[0], 1.5, p[1] + c[1]); });
         box(std({ color: 0x9A5A45 }), 1.4, 1.1, 0.7, p[0], 0.55, p[1] - 1.6);
@@ -420,14 +420,14 @@
       });
       // playground
       const red = std({ color: 0xD24B3E }), yellow = std({ color: 0xE5B53A }), blue = std({ color: 0x2F62B5 });
-      box(red, 2.2, 2.2, 2.2, 50, 1.1, -26); box(blue, 0.8, 0.12, 3.6, 50, 1.2, -22.6).rotation.x = 0.55;
-      box(yellow, 4, 0.15, 0.15, 55.5, 2.4, -24); box(yellow, 0.15, 2.4, 0.15, 53.5, 1.2, -24); box(yellow, 0.15, 2.4, 0.15, 57.5, 1.2, -24);
+      box(red, 2.2, 2.2, 2.2, 35, 1.1, -44); box(blue, 0.8, 0.12, 3.6, 35, 1.2, -40.6).rotation.x = 0.55;
+      box(yellow, 4, 0.15, 0.15, 40.5, 2.4, -42); box(yellow, 0.15, 2.4, 0.15, 38.5, 1.2, -42); box(yellow, 0.15, 2.4, 0.15, 42.5, 1.2, -42);
       // espaço pet: cerca baixa
       const fence = std({ color: 0x4A4F57 });
-      box(fence, 14, 0.9, 0.08, -52, 0.45, -54); box(fence, 14, 0.9, 0.08, -52, 0.45, -42); box(fence, 0.08, 0.9, 12, -59, 0.45, -48);
+      box(fence, 16, 0.9, 0.08, 58, 0.45, -54); box(fence, 16, 0.9, 0.08, 58, 0.45, -40); box(fence, 0.08, 0.9, 14, 50, 0.45, -47);
       // muro do condomínio (baixo, com gradil)
       const wallMat = std({ color: 0x5A5E66, roughness: 0.9 });
-      [[0, SITE.z0, SITE.x1 - SITE.x0, 0.2], [SITE.x0, (SITE.z0 + SITE.z1) / 2, 0.2, SITE.z1 - SITE.z0], [SITE.x1, (SITE.z0 + SITE.z1) / 2, 0.2, SITE.z1 - SITE.z0], [-31, SITE.z1, 62, 0.2], [42, SITE.z1, 40, 0.2]].forEach(function (w) {
+      [[0, SITE.z0, SITE.x1 - SITE.x0, 0.2], [SITE.x0, (SITE.z0 + SITE.z1) / 2, 0.2, SITE.z1 - SITE.z0], [SITE.x1, (SITE.z0 + SITE.z1) / 2, 0.2, SITE.z1 - SITE.z0], [-30, SITE.z1, 84, 0.2], [50, SITE.z1, 44, 0.2]].forEach(function (w) {
         const m = new THREE.Mesh(new THREE.BoxGeometry(w[2], 1.8, w[3]), wallMat); m.position.set(w[0], 0.9, w[1]); m.castShadow = true; scene.add(m);
       });
     })();
@@ -436,13 +436,13 @@
     (function buildContext() {
       const R = rng(2026);
       const trees = [];
-      for (let x = -58; x <= 58; x += 7.5) { trees.push([x + R() * 2, -60.5 - R()]); }
-      for (let z = -50; z <= 40; z += 8) { trees.push([-64.5 - R(), z + R() * 2]); trees.push([64.5 + R(), z + R() * 2]); }
-      for (let x = -80; x <= 80; x += 11) { if (Math.abs(x - 12) > 12) trees.push([x + R() * 3, 45 + R()]); }
-      [[-30, 30], [-44, 33], [40, 28], [30, -42], [0, -46], [-28, -6], [-36, 8], [42, 6], [6, -6], [-6, 26], [50, 44]].forEach(function (p) { trees.push(p); });
+      for (let x = -68; x <= 68; x += 7.5) { trees.push([x + R() * 2, -62.5 - R()]); }
+      for (let z = -52; z <= 40; z += 8) { trees.push([-74.5 - R(), z + R() * 2]); trees.push([74.5 + R(), z + R() * 2]); }
+      for (let x = -90; x <= 90; x += 11) { if (Math.abs(x - 20) > 12) trees.push([x + R() * 3, 45 + R()]); }
+      [[-60, -26], [-14, -14], [6, -16], [26, -22], [46, -26], [64, -26], [-6, 30], [48, 44], [-64, 44], [2, -44], [-4, -56]].forEach(function (p) { trees.push(p); });
       for (let i = 0; i < 160; i++) {
-        const x = (R() - 0.5) * 520, z = (R() - 0.5) * 460 - 20;
-        if (x > -72 && x < 72 && z > -68 && z < 64) continue;
+        const x = (R() - 0.5) * 560, z = (R() - 0.5) * 460 - 20;
+        if (x > -82 && x < 82 && z > -70 && z < 64) continue;
         if (z > 45 && z < 63) continue;
         trees.push([x, z]);
       }
@@ -462,8 +462,8 @@
 
       const houses = [];
       for (let i = 0; i < 420 && houses.length < 150; i++) {
-        const x = (R() - 0.5) * 560, z = (R() - 0.5) * 520 - 10;
-        if (x > -76 && x < 76 && z > -72 && z < 66) continue;
+        const x = (R() - 0.5) * 600, z = (R() - 0.5) * 520 - 10;
+        if (x > -86 && x < 86 && z > -74 && z < 66) continue;
         if (z > 44 && z < 64) continue;
         if (houses.some(function (h) { return Math.abs(h[0] - x) < 13 && Math.abs(h[1] - z) < 13; })) continue;
         houses.push([x, z, 7 + R() * 6, 8 + R() * 6, 3 + R() * 3.2, R() * 0.4 - 0.2]);
@@ -605,7 +605,7 @@
     }
 
     /* ---------------- câmera ---------------- */
-    const HOME = { target: new THREE.Vector3(-1, 11, -6), r: 150, phi: 1.12, theta: 0.62 };
+    const HOME = { target: new THREE.Vector3(0, 11, -6), r: 182, phi: 1.12, theta: 0.42 };
     let tween = null;
     function spherical(target, r, phi, theta) {
       return new THREE.Vector3(target.x + r * Math.sin(phi) * Math.sin(theta), target.y + r * Math.cos(phi), target.z + r * Math.sin(phi) * Math.cos(theta));
@@ -690,7 +690,7 @@
     controls.addEventListener('change', function () { dirty = true; });
 
     /* ---------------- laço ---------------- */
-    let visible = true, raf = 0;
+    let visible = true, raf = 0, paused = false;
     const tmp = new THREE.Vector3();
     function placeLabels() {
       const r = cv.getBoundingClientRect(), w = r.width, h = r.height;
@@ -703,7 +703,7 @@
     }
     function frame(now) {
       raf = requestAnimationFrame(frame);
-      if (!visible) return;
+      if (!visible || paused) return;
       if (tween) {
         const k = Math.min(1, (now - tween.t0) / tween.ms), e = easeInOut(k);
         controls.target.lerpVectors(tween.fromT, tween.toT, e);
@@ -757,6 +757,13 @@
         dirty = true;
       },
       home: function () { goHome(900); },
+      focusUnit: function (pos, ms) {
+        if (!sel) return;
+        const T = towers[sel.torre].T, r = unitRect(pos);
+        const tgt = new THREE.Vector3(T.x + (r.x0 + r.x1) / 2, sel.andar * FH + 1.0, T.z + (r.z0 + r.z1) / 2);
+        flyTo(tgt, spherical(tgt, fitR(19), 1.02, r.front ? 0.18 : Math.PI + 0.18), ms === undefined ? 900 : ms);
+      },
+      setPaused: function (p) { paused = !!p; dirty = true; },
       interacted: function () { return interacted; },
       FH: FH, unitRect: unitRect, L: L, D: D, LOGGIA: LOGGIA
     };

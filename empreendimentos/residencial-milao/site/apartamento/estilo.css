@@ -1,29 +1,32 @@
 /* Layout: maquete 3D de ponta a ponta; ficha do imóvel no alto à esquerda, cômodos no alto à direita, doca de controles ancorada embaixo; na visita, joystick acima da doca. */
 :root{
-  --bg:#E6E8EB;
-  --panel:rgba(251,251,250,.9);
-  --panel-solid:#FBFBFA;
-  --ink:#1A2030;
-  --muted:#586172;
-  --line:rgba(26,32,48,.14);
-  --chip:rgba(26,32,48,.07);
+  /* mesma paleta do site do prédio: cinza da fachada, azul-marinho dos painéis, dourado do núcleo */
+  --bg:#ECEEF2;
+  --panel:rgba(255,255,255,.92);
+  --panel-solid:#FFFFFF;
+  --ink:#121937;
+  --muted:#586079;
+  --line:rgba(18,25,55,.13);
+  --chip:rgba(18,25,55,.06);
+  --navy:#1F2E86;
+  --navy-ink:#FFFFFF;
   --accent:#D3A02B;
-  --accent-ink:#1A2030;
-  --shadow:0 1px 2px rgba(18,22,32,.06),0 10px 28px rgba(18,22,32,.12);
+  --accent-ink:#121937;
+  --shadow:0 1px 2px rgba(18,25,55,.06),0 12px 32px rgba(18,25,55,.12);
   --f-ui:"Archivo","Helvetica Neue",Arial,sans-serif;
   --f-num:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
 }
 @media (prefers-color-scheme:dark){
   :root:not([data-theme="light"]){
-    --bg:#13161B;--panel:rgba(27,31,39,.9);--panel-solid:#1B1F27;--ink:#ECEEF2;--muted:#A3ABB8;
-    --line:rgba(236,238,242,.14);--chip:rgba(236,238,242,.08);--accent:#E2B444;--accent-ink:#14171C;
-    --shadow:0 1px 2px rgba(0,0,0,.35),0 12px 32px rgba(0,0,0,.42);color-scheme:dark;
+    --bg:#0E1326;--panel:rgba(21,28,52,.92);--panel-solid:#151C34;--ink:#E8EBF5;--muted:#A2A9C1;
+    --line:rgba(232,235,245,.13);--chip:rgba(232,235,245,.07);--navy:#93A2FF;--navy-ink:#0E1326;--accent:#E2B444;--accent-ink:#0E1326;
+    --shadow:0 1px 2px rgba(0,0,0,.35),0 14px 36px rgba(0,0,0,.45);color-scheme:dark;
   }
 }
 :root[data-theme="dark"]{
-  --bg:#13161B;--panel:rgba(27,31,39,.9);--panel-solid:#1B1F27;--ink:#ECEEF2;--muted:#A3ABB8;
-  --line:rgba(236,238,242,.14);--chip:rgba(236,238,242,.08);--accent:#E2B444;--accent-ink:#14171C;
-  --shadow:0 1px 2px rgba(0,0,0,.35),0 12px 32px rgba(0,0,0,.42);color-scheme:dark;
+  --bg:#0E1326;--panel:rgba(21,28,52,.92);--panel-solid:#151C34;--ink:#E8EBF5;--muted:#A2A9C1;
+  --line:rgba(232,235,245,.13);--chip:rgba(232,235,245,.07);--navy:#93A2FF;--navy-ink:#0E1326;--accent:#E2B444;--accent-ink:#0E1326;
+  --shadow:0 1px 2px rgba(0,0,0,.35),0 14px 36px rgba(0,0,0,.45);color-scheme:dark;
 }
 [hidden]{display:none!important}
 html,body{height:100%}
@@ -98,7 +101,7 @@ button{font:inherit;color:inherit}
 .btn svg{width:16px;height:16px;flex:none;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
 .btn:hover{background:var(--chip)}
 .btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-.seg .btn[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+.seg .btn[aria-pressed="true"]{background:var(--navy);color:var(--navy-ink)}
 .toggle .dot{width:7px;height:7px;border-radius:50%;border:1.5px solid currentColor;opacity:.5;flex:none}
 .toggle[aria-pressed="true"] .dot{background:var(--accent);border-color:var(--accent);opacity:1}
 .btn-exit{background:var(--ink);color:var(--bg)}
@@ -141,3 +144,9 @@ button{font:inherit;color:inherit}
   .pill i{display:none}
 }
 @media (prefers-reduced-motion:reduce){.loading{transition:none}}
+
+/* dentro do site do prédio: a ficha, os cômodos e os botões ficam no painel do site; aqui sobra só a dica e a barra da visita */
+.app.is-embed .title,.app.is-embed .rooms,.app.is-embed .dock-row{display:none}
+.app.is-embed .dock{padding:6px 12px;border-radius:999px}
+.app.is-embed .hint{padding:0}
+.app.is-embed .ui{padding-block:12px}

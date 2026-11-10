@@ -1,7 +1,11 @@
 /* Planta medida em pixels sobre a imagem oficial (871 x 749 px) e convertida por escala.
    Escala calibrada pelas cotas 2,37 / 2,39 / 2,39 / 4,32 / 3,14 / 3,74 / 2,10 / 4,04 => 105,43 px por metro.
    Retângulos: [x1, y1, x2, y2] em px; origem no canto externo superior esquerdo (32, 48). */
-window.PLAN = {
+window.PLANS = window.PLANS || {};
+window.PLANS['sem-sacada'] = {
+  id: 'sem-sacada',
+  meta: { titulo: 'Apartamento sem sacada', area: '47,08', comodos: '40,54', img: 'planta-sem-sacada.jpg', imgSize: [871, 749] },
+  extent: [852, 728],
   scale: 105.43,
   origin: [32, 48],
   H: 2.50,
@@ -83,36 +87,21 @@ window.PLAN = {
     { id: 'circ',  name: 'Circulação',         area: '5,27',  dims: '',            label: [432, 600],
       view: { at: [385, 688], to: [440, 430] }, lights: [[430, 560]],
       rects: [[315, 413, 440, 491], [315, 491, 539, 712], [330, 712, 437, 728]] }
-  ]
-};
-
-/* Divide cada parede em trechos sólidos, peitoris e vergas conforme as aberturas. Resultado em px (planta) e metros (altura). */
-window.buildArch = function (P, H) {
-  var out = { walls: [], windows: [], doors: [] };
-  P.walls.forEach(function (w) {
-    var x1 = w.r[0], y1 = w.r[1], x2 = w.r[2], y2 = w.r[3];
-    var horiz = (x2 - x1) >= (y2 - y1);
-    var A0 = horiz ? x1 : y1, A1 = horiz ? x2 : y2, C0 = horiz ? y1 : x1, C1 = horiz ? y2 : x2;
-    var opens = (w.open || []).slice().sort(function (p, q) { return p.a - q.a; });
-    function seg(a, b, h0, h1, kind) {
-      if (b - a <= 0.01 || h1 - h0 <= 0.001) return;
-      out.walls.push({ horiz: horiz, a: a, b: b, c0: C0, c1: C1, h0: h0, h1: h1, kind: kind, wall: w.id });
-    }
-    var cur = A0;
-    opens.forEach(function (o) {
-      seg(cur, o.a, 0, H, 'solid');
-      if (o.kind === 'win') {
-        var sp = P.windows[o.win];
-        seg(o.a, o.b, 0, Math.min(sp.sill, H), 'below');
-        if (sp.top < H) seg(o.a, o.b, sp.top, H, 'lintel');
-        out.windows.push({ id: o.win, horiz: horiz, a: o.a, b: o.b, c0: C0, c1: C1, spec: sp, wall: w.id });
-      } else {
-        if (P.doorTop < H) seg(o.a, o.b, P.doorTop, H, 'lintel');
-        out.doors.push({ id: o.door, horiz: horiz, a: o.a, b: o.b, c0: C0, c1: C1, spec: P.doors[o.door], wall: w.id });
-      }
-      cur = o.b;
-    });
-    seg(cur, A1, 0, H, 'solid');
-  });
-  return out;
+  ],
+  // parede de destaque azul-marinho (igual às almofadas) na sala, atrás da árvore de Natal
+  accentWalls: [{ dir: 'W', at: 836, from: 289, to: 491 }],
+  switches: { d1: [299, 406, 'W'], d2: [438, 397, 'N'], banho: [315, 662, 'E'], circ: [449, 712, 'N'], estar: [584, 400, 'E'], coz: [741, 558, 'W'] },
+  shaftRooms: { d1: [48, 66, 299, 522], d2: [315, 66, 567, 397], estar: [584, 98, 836, 491] },
+  // zonas de luz: 0 dorm.1, 1 vão d1, 2 dorm.2, 3 vão d2, 4 banho, 5 vão banho, 6–9 sala/cozinha/circulação
+  zoneRects: [[33.6, 49.6, 302, 525], [296, 417, 318, 519], [312, 49.6, 570, 400], [327, 394, 430, 416], [33.6, 536, 302, 726.4], [296, 551, 318, 653],
+    [312, 410, 587, 494], [581, 81.6, 850.4, 494], [754, 491, 850.4, 506.4], [312, 488, 755.4, 726.4]],
+  // janelas vistas de fora nos andares de baixo: [id, a, b, face externa, lado]
+  facadeWins: [['d1', 110, 237, 48, 'N'], ['d2', 378, 506, 48, 'N'], ['estar', 630, 789, 80, 'N'], ['coz', 570, 634, 757, 'E']],
+  poses: {
+    cama1: { kind: 'lie', label: 'Deitar na cama', at: [100, 206], y: 0.80, yaw: 90, pitch: 0.24, stand: [180, 336] },
+    sofa: { kind: 'sit', label: 'Sentar no sofá', at: [655, 212], y: 1.12, yaw: 90, pitch: 0.05, stand: [742, 212] }
+  },
+  toilet: { c: [186.5, 664], tank: [167, 689, 207, 712], btn: [187, 700] },
+  console: { xf: 808, xb: 831, padX: 815 },
+  mirrorWall: { x0: 429, x1: 583.5, at: 413 }
 };

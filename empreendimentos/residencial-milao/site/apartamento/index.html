@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Milão Sem Sacada 3D</title>
+<title>Milão Apartamento 3D</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -22,7 +22,7 @@
       <p class="eyebrow">Residencial Milão · São Leopoldo/RS</p>
       <h1>Apartamento sem sacada</h1>
       <dl class="facts">
-        <div><dt>Área privativa</dt><dd>47,08 m²</dd></div>
+        <div><dt>Área privativa</dt><dd id="factArea">47,08 m²</dd></div>
         <div><dt>Dormitórios</dt><dd>2</dd></div>
         <div><dt>Pé-direito</dt><dd>2,50 m*</dd></div>
       </dl>
@@ -37,7 +37,7 @@
     </div>
 
     <details class="rooms card" id="rooms">
-      <summary>Cômodos <span class="mono">40,54 m²</span></summary>
+      <summary>Cômodos <span class="mono" id="roomsTotal">40,54 m²</span></summary>
       <ul id="roomList"></ul>
       <p class="note">Toque num cômodo para entrar nele. Na visita, toque nos objetos para usar: portas, armários, geladeira, janelas, persianas (parte de cima da janela), interruptores e luzes, TVs, ar-condicionado, videogame, torneiras, chuveiro, fogão, privada (tampa e descarga), pisca-pisca da árvore de Natal, camas e sofá. A vista é do 5º andar, num dia de sol. *Pé-direito e altura das janelas são estimados; a planta não informa.</p>
     </details>
@@ -80,7 +80,8 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" onerror="window.__aptLibFail=true"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js" onerror="window.__aptLibFail=true"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/objects/Reflector.js"></script>
-<script src="planta-dados.js"></script>
+<script src="planta-sem-sacada.js"></script>
+<script src="planta-com-sacada.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

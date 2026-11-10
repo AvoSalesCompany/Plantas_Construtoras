@@ -101,7 +101,7 @@
     if (predio) predio.clearFloor();
   }
   $('btnVoltar').addEventListener('click', fecharAndar);
-  $('btnHome').addEventListener('click', function () { if (state.andar) fecharAndar(); else if (predio) predio.home(); });
+  $('btnHome').addEventListener('click', function () { if (apto) return; if (state.andar) fecharAndar(); else if (predio) predio.home(); });
 
   // planta do andar em SVG: frente (entrada) embaixo, fundos em cima; 10 px por metro
   function renderPlanta() {
@@ -164,43 +164,123 @@
       '</dl>' +
       roomsHTML(T) +
       '<div class="unit-actions">' +
-        (T.tour3d ? '<button class="btn btn-ink" type="button" id="btnTour">Ver por dentro em 3D</button>'
-                  : '<button class="btn btn-ink" type="button" disabled aria-describedby="notaTour">Ver por dentro em 3D</button>') +
+        '<button class="btn btn-ink" type="button" id="btnTour">Ver por dentro em 3D</button>' +
         '<button class="btn btn-gold" type="button" id="btnInteresse"' + (pode ? '' : ' disabled') + '>' + (u.status === 'reservado' ? 'Entrar na fila' : 'Tenho interesse') + '</button>' +
       '</div>' +
-      (T.tour3d ? '<p class="unit-note">A visita abre na vista do ' + u.andar + 'º andar, a ' + num(u.altura, 1) + ' m do chão.</p>'
-                : '<p class="unit-note" id="notaTour">A visita 3D da planta com sacada ainda está sendo modelada. Ela tem estar de 10,29 m² com saída para a sacada e cozinha de 6,24 m².</p>') +
+      '<p class="unit-note">A visita abre com a vista da janela do ' + u.andar + 'º andar, a ' + num(u.altura, 1) + ' m do chão.</p>' +
       (pode ? '' : '<p class="unit-note">Este apartamento já foi vendido. Os disponíveis aparecem em verde.</p>');
-    const bt = $('btnTour'); if (bt) bt.addEventListener('click', function () { abrirTour(u); });
+    const bt = $('btnTour'); if (bt) bt.addEventListener('click', function () { entrarApto(u); });
     const bi = $('btnInteresse'); if (bi) bi.addEventListener('click', function () { atualizarMensagem(true); $('interesse').scrollIntoView({ behavior: 'smooth' }); $('msgNome').focus({ preventScroll: true }); });
   }
 
-  /* ---------- visita 3D do apartamento ---------- */
-  let lastFocus = null;
-  function abrirTour(u) {
-    const tour = $('tour'), old = $('tourFrame');
-    const andar = u ? u.andar : 5;
-    const hash = '#andar=' + andar + (u ? '&apto=' + u.num + '&torre=' + u.torre : '');
-    const fr = document.createElement('iframe');                   // iframe novo: o apartamento lê o andar ao carregar
-    fr.id = 'tourFrame'; fr.title = 'Apartamento em 3D'; fr.setAttribute('allow', 'fullscreen');
-    fr.src = 'apartamento/index.html' + hash;
-    old.replaceWith(fr);
-    $('tourAbrir').href = 'apartamento/index.html' + hash;
-    $('tourTitulo').textContent = u ? 'Apartamento ' + u.num + ' · Torre ' + u.torre : 'Planta sem sacada';
-    $('tourSub').textContent = (u ? u.andar + 'º andar · ' : '') + 'Sem sacada · 47,08 m² · arraste para girar, Visitar para andar por dentro';
-    lastFocus = document.activeElement;
-    tour.hidden = false; document.body.classList.add('is-touring');
-    $('tourFechar').focus();
+  /* ---------- visita ao apartamento: no mesmo palco do prédio ----------
+     O prédio aproxima a câmera do apto escolhido, uma cortina com o número do apto cobre o palco
+     enquanto a maquete carrega e, quando ela avisa que está pronta, a cortina abre. O painel ao lado
+     passa a controlar a maquete (vistas, opções e cômodos) por mensagens. */
+  const explorer = $('explorar'), aptLayer = $('aptLayer'), curtain = $('curtain');
+  const reduce = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
+  let apto = null, aptoTimer = 0;
+  const VIEW_CMD = { '3d': 'v3d', top: 'vTop', walk: 'vVisit', free: 'vFree' };
+  function frame() { return $('aptFrame'); }
+  function enviar(msg) { const f = frame(); try { if (f && f.contentWindow) f.contentWindow.postMessage(msg, '*'); } catch (e) { /* maquete ainda carregando */ } }
+  function mostrarView(id) { ['viewAndares', 'viewAndar', 'viewApto'].forEach(function (v) { $(v).hidden = v !== id; }); }
+  function cortina(on, titulo, sub, msg) {
+    if (titulo !== undefined) $('curtainTitle').textContent = titulo;
+    if (sub !== undefined) $('curtainSub').textContent = sub;
+    $('curtainMsg').textContent = msg || 'Entrando no apartamento…';
+    curtain.classList.toggle('is-open', !on);
   }
-  function fecharTour() {
-    const tour = $('tour'); if (tour.hidden) return;
-    tour.hidden = true; document.body.classList.remove('is-touring');
-    const fr = $('tourFrame'), blank = document.createElement('iframe');
-    blank.id = 'tourFrame'; blank.title = 'Apartamento em 3D'; fr.replaceWith(blank);   // descarrega o 3D do apartamento
-    if (lastFocus && lastFocus.focus) lastFocus.focus();
+  function entrarApto(u, tipo) {
+    const t = u ? u.tipo : tipo, T = DATA.tipos[t], andar = u ? u.andar : 5;
+    apto = { u: u, tipo: t, pronto: false };
+    const hash = '#embed=1&tipo=' + t + '&andar=' + andar + (u ? '&apto=' + u.num + '&torre=' + u.torre : '');
+    // painel
+    $('aptoTitulo').textContent = u ? 'Apto ' + u.num : 'Planta ' + T.nome.toLowerCase();
+    $('aptoSub').textContent = (u ? 'Torre ' + u.torre + ' · ' + u.andar + 'º andar · ' : '') + T.nome + ' · ' + num(T.area, 2) + ' m²';
+    $('voltarRotulo').textContent = u ? u.andar + 'º andar' : 'Prédio';
+    $('aptoTotal').textContent = '—';
+    $('aptoComodos').innerHTML = '<li class="unit-empty">Carregando os cômodos…</li>';
+    mostrarView('viewApto');
+    // palco: aproxima a câmera do apto, fecha a cortina e carrega a maquete por trás dela
+    const titulo = u ? 'Apto ' + u.num : T.nome, sub = u ? 'Torre ' + u.torre + ' · ' + u.andar + 'º andar · ' + T.nome.toLowerCase() : 'Residencial Milão · ' + T.planta.toLowerCase();
+    cortina(true, titulo, sub);
+    curtain.classList.add('is-instant');
+    curtain.classList.remove('is-open');
+    explorer.classList.add('is-entering');
+    if (predio && u) predio.focusUnit(u.pos, reduce ? 0 : 900);
+    setTimeout(function () {
+      curtain.classList.remove('is-instant');
+      aptLayer.hidden = false;
+      explorer.classList.add('is-apto');
+      const fr = document.createElement('iframe');
+      fr.id = 'aptFrame'; fr.title = 'Apartamento ' + (u ? u.num : T.nome.toLowerCase()) + ' em 3D'; fr.setAttribute('allow', 'fullscreen');
+      fr.src = 'apartamento/index.html' + hash;
+      frame().replaceWith(fr);
+      clearTimeout(aptoTimer);
+      aptoTimer = setTimeout(function () { if (apto && !apto.pronto) abrirCortina(); }, 9000);
+    }, (predio && u && !reduce) ? 650 : 0);
+    if (window.innerWidth <= 980) $('canvasBox').scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
   }
-  $('tourFechar').addEventListener('click', fecharTour);
-  document.addEventListener('keydown', function (ev) { if (ev.key === 'Escape' && !$('tour').hidden) fecharTour(); });
+  function abrirCortina() {
+    if (predio) predio.setPaused(true);
+    explorer.classList.remove('is-entering');
+    cortina(false);
+  }
+  function sairApto() {
+    if (!apto) return;
+    clearTimeout(aptoTimer);
+    cortina(true, undefined, undefined, 'Voltando ao prédio…');
+    setTimeout(function () {
+      const blank = document.createElement('iframe');
+      blank.id = 'aptFrame'; blank.title = 'Apartamento em 3D'; frame().replaceWith(blank);   // descarrega a maquete
+      aptLayer.hidden = true;
+      explorer.classList.remove('is-apto', 'is-entering');
+      if (predio) { predio.setPaused(false); if (state.andar) predio.selectFloor(state.torre, state.andar, true); else predio.home(); }
+      if (state.andar) { mostrarView('viewAndar'); if (state.pos) predio && predio.selectUnit(state.pos); } else mostrarView('viewAndares');
+      apto = null;
+    }, reduce ? 0 : 460);
+  }
+  $('btnSairApto').addEventListener('click', sairApto);
+  document.querySelectorAll('#viewApto [data-cmd]').forEach(function (b) {
+    b.addEventListener('click', function () { enviar({ type: 'apt:cmd', id: b.dataset.cmd }); });
+  });
+  $('aptoComodos').addEventListener('click', function (ev) { const b = ev.target.closest('[data-room]'); if (b) enviar({ type: 'apt:room', id: b.dataset.room }); });
+  $('btnTelaCheia').addEventListener('click', function () {
+    const alvo = aptLayer;
+    try {
+      const req = alvo.requestFullscreen || alvo.webkitRequestFullscreen;
+      if (req) { const r = req.call(alvo); if (r && r.catch) r.catch(function () { $('btnTelaCheia').textContent = 'Tela cheia indisponível aqui'; }); }
+      else $('btnTelaCheia').textContent = 'Tela cheia indisponível aqui';
+    } catch (e) { $('btnTelaCheia').textContent = 'Tela cheia indisponível aqui'; }
+  });
+  $('btnInteresseApto').addEventListener('click', function () {
+    if (apto && apto.u) { state.escolhido = apto.u; atualizarMensagem(true); }
+    $('interesse').scrollIntoView({ behavior: reduce ? 'auto' : 'smooth' }); $('msgNome').focus({ preventScroll: true });
+  });
+  window.addEventListener('message', function (ev) {
+    const f = frame();
+    if (!apto || !f || ev.source !== f.contentWindow) return;
+    const d = ev.data || {};
+    if (d.type === 'apt:ready') {
+      apto.pronto = true;
+      $('aptoTotal').textContent = d.comodos + ' m²';
+      $('aptoComodos').innerHTML = d.rooms.map(function (r) {
+        return '<li><button type="button" class="room-btn" data-room="' + esc(r.id) + '"><span class="rn">' + esc(r.name) + '</span><span class="ra">' + esc(r.area) + ' m²</span>' +
+          (r.dims ? '<span class="rd">' + esc(r.dims) + ' m</span>' : '') + '</button></li>';
+      }).join('');
+      setTimeout(abrirCortina, reduce ? 0 : 150);
+    } else if (d.type === 'apt:state') {
+      document.querySelectorAll('#viewApto .seg-btn').forEach(function (b) { b.setAttribute('aria-pressed', String(VIEW_CMD[d.view] === b.dataset.cmd)); });
+      const tg = { tRotate: d.rotate, tWalls: d.wallsLow, tFurn: d.furniture, tLabels: d.labels, tDoors: d.doorsOpen, tOverlay: d.overlay };
+      document.querySelectorAll('#viewApto .tgl').forEach(function (b) { b.setAttribute('aria-pressed', String(!!tg[b.dataset.cmd])); b.disabled = !!d.imm && (b.dataset.cmd === 'tRotate' || b.dataset.cmd === 'tWalls'); });
+      document.querySelectorAll('#aptoComodos .room-btn').forEach(function (b) { b.setAttribute('aria-current', String(!!d.imm && d.room === b.dataset.room)); });
+      $('aptoDica').textContent = d.imm
+        ? 'Clique nas portas, luzes e interruptores, janelas e persianas, TVs, ar-condicionado, torneiras, chuveiro, fogão, privada, camas e sofá.'
+        : 'Toque num cômodo para entrar nele, ou em Visitar para andar pelo apartamento.';
+    } else if (d.type === 'apt:error') {
+      cortina(true, undefined, undefined, 'A maquete não abriu neste navegador. Ela precisa de WebGL.');
+    }
+  });
 
   /* ---------- seções ---------- */
   (function renderSecoes() {
@@ -211,11 +291,15 @@
         '<p class="plan-sub">' + T.planta + ' · ' + T.posicoes.length + ' por andar · 2 dormitórios</p>' +
         roomsHTML(T) +
         '<div class="plan-price"><p>A partir de<strong>' + brl.format(T.preco) + '</strong></p>' +
-        (T.tour3d ? '<button class="btn btn-line" type="button" data-tour="1">Ver por dentro em 3D</button>' : '<span class="fine">Visita 3D em produção</span>') +
+        '<button class="btn btn-line" type="button" data-tour="' + k + '">Ver por dentro em 3D</button>' +
         '</div></article>';
     });
     $('cartoesPlantas').innerHTML = cards.join('');
-    $('cartoesPlantas').addEventListener('click', function (ev) { if (ev.target.closest('[data-tour]')) abrirTour(null); });
+    $('cartoesPlantas').addEventListener('click', function (ev) {
+      const b = ev.target.closest('[data-tour]'); if (!b) return;
+      $('explorar').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      entrarApto(null, b.dataset.tour);
+    });
     $('acabamentos').innerHTML = DATA.acabamentos.map(function (a) { return '<li>' + esc(a) + '</li>'; }).join('');
 
     const ICON = {
@@ -313,7 +397,7 @@
         canvas: $('predio'), host: box, labels: $('labels'),
         statusOf: statusOf, typeOf: typeOf, colors: tokens, night: isDark(),
         onHover: showTip,
-        onPickFloor: function (t, a) { if (t !== state.torre) { state.torre = t; $('torreA').setAttribute('aria-pressed', t === 'A'); $('torreB').setAttribute('aria-pressed', t === 'B'); renderAndares(); } abrirAndar(a, true); showTip(null); },
+        onPickFloor: function (t, a) { if (apto) return; if (t !== state.torre) { state.torre = t; $('torreA').setAttribute('aria-pressed', t === 'A'); $('torreB').setAttribute('aria-pressed', t === 'B'); renderAndares(); } abrirAndar(a, true); showTip(null); },
         onPickUnit: function (p) { escolher(p); },
         onPickTower: function (t) { setTorre(t); }
       });

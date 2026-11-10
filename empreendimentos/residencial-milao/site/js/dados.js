@@ -2,7 +2,8 @@
  * Dados do Residencial Milão — fonte única para o site.
  * Origem: site da Baliza Construtora (balizaconstrutora.com.br/empreendimentos/residencial-milao/), consultado em nov/2026.
  * O número de torres, andares e aptos por andar NÃO é publicado pela construtora:
- * foi estimado pelas fachadas e fotos aéreas (2 torres x 12 andares x 12 aptos = 288 unidades).
+ * foi estimado pelas fachadas e fotos aéreas (2 torres lado a lado x 12 andares x 12 aptos = 288 unidades).
+ * As plantas publicadas são "Apto Canto-101" (com sacada) e "Apto Meio-103" (sem sacada).
  * A disponibilidade (livre / reservado / vendido) é ilustrativa; no site final ela viria do sistema de vendas.
  */
 window.MILAO = {
@@ -34,7 +35,7 @@ window.MILAO = {
   tipos: {
     'sem-sacada': {
       nome: 'Sem sacada',
-      planta: 'Apartamento de meio',
+      planta: 'Apartamento de meio',           // "Apto Meio-103" da Baliza
       area: 47.08,
       preco: 230703.00,
       posicoes: [2, 3, 4, 5, 8, 9, 10, 11],
@@ -50,11 +51,11 @@ window.MILAO = {
     },
     'com-sacada': {
       nome: 'Com sacada',
-      planta: 'Apartamento de canto',
+      planta: 'Apartamento de canto',          // "Apto Canto-101" da Baliza: a sacada fica na ponta do prédio
       area: 49.69,
       preco: 238094.31,
       posicoes: [1, 6, 7, 12],
-      tour3d: false,
+      tour3d: true,
       comodos: [
         ['Estar / Jantar', 10.29],
         ['Dormitório 1', 10.24],

@@ -572,13 +572,48 @@
     }
     const plateMats = { slab: std({ color: 0xE9EAEC }), corridor: std({ color: 0xF7F7F5 }), shaft: std({ color: 0x41464F }) };
     const PLAN_TINT = { livre: 0xFFFFFF, reservado: 0x272C37, vendido: 0x272C37 };
-    const wallMats = {
-      on: std({ color: 0xF3F1EC, roughness: 0.85, emissive: new THREE.Color(0xFFE2B0), emissiveIntensity: 0.28 }),
-      off: std({ color: 0x2C313C, roughness: 0.9 }),
-      onDim: std({ color: 0xF3F1EC, roughness: 0.85, transparent: true, opacity: 0.25, depthWrite: false }),
-      offDim: std({ color: 0x2C313C, roughness: 0.9, transparent: true, opacity: 0.25, depthWrite: false })
+    // maquete de cada apartamento no andar aberto: paredes e móveis em 3D (instanciados: poucas chamadas de desenho por apto)
+    const miniMats = {
+      on: std({ color: 0xFFFFFF, roughness: 0.82, emissive: new THREE.Color(0xFFDDB0), emissiveIntensity: 0.12 }),
+      off: std({ color: 0xFFFFFF, roughness: 0.92 }),
+      onDim: std({ color: 0xFFFFFF, roughness: 0.82, transparent: true, opacity: 0.25, depthWrite: false }),
+      offDim: std({ color: 0xFFFFFF, roughness: 0.92, transparent: true, opacity: 0.25, depthWrite: false })
     };
-    const wallGeo = new THREE.BoxGeometry(1, 1, 1);
+    const miniBox = new THREE.BoxGeometry(1, 1, 1), miniCyl = new THREE.CylinderGeometry(1, 1, 1, 18);
+    const OFF_COLOR = new THREE.Color(0x1C2029), WALL_COLOR = '#F3F1EC';
+    function miniColor(hex, lit) { const c = new THREE.Color(hex); if (!lit) c.lerp(OFF_COLOR, 0.8); return c.convertSRGBToLinear(); }
+    function miniModel(parent, tipo, w, d, lit, dim) {
+      const P = window.PLANS && window.PLANS[tipo]; if (!P) return;
+      const ox = P.origin[0], oy = P.origin[1], W = P.extent[0] - ox, H = P.extent[1] - oy;
+      const X = function (px) { return ((px - ox) / W - 0.5) * w; }, Z = function (py) { return ((py - oy) / H - 0.5) * d; };
+      const items = [], rounds = [];
+      planWalls(tipo).forEach(function (q) {
+        items.push([((q.u0 + q.u1) / 2 - 0.5) * w, ((q.v0 + q.v1) / 2 - 0.5) * d, Math.max(0.02, (q.u1 - q.u0) * w), Math.max(0.02, (q.v1 - q.v0) * d), 0, q.h, WALL_COLOR]);
+      });
+      ((P.mini && P.mini.box) || []).forEach(function (b) {
+        const h0 = b[4], h1 = Math.min(b[5], WALL_CUT);
+        if (h1 - h0 > 0.004) items.push([(X(b[0]) + X(b[2])) / 2, (Z(b[1]) + Z(b[3])) / 2, Math.abs(X(b[2]) - X(b[0])), Math.abs(Z(b[3]) - Z(b[1])), h0, h1, b[6]]);
+      });
+      ((P.mini && P.mini.cyl) || []).forEach(function (c) {
+        const h0 = c[4], h1 = Math.min(c[5], WALL_CUT);
+        if (h1 - h0 > 0.004) rounds.push([X(c[0]), Z(c[1]), c[2] / W * w, c[3] / H * d, h0, h1, c[6]]);
+      });
+      const mat = miniMats[(lit ? 'on' : 'off') + (dim ? 'Dim' : '')];
+      [[items, miniBox], [rounds, miniCyl]].forEach(function (set) {
+        const list = set[0]; if (!list.length) return;
+        const im = new THREE.InstancedMesh(set[1], mat, list.length);
+        list.forEach(function (it, i) {
+          dm.rotation.set(0, 0, 0);
+          dm.position.set(it[0], 0.016 + (it[4] + it[5]) / 2, it[1]);
+          dm.scale.set(it[2], it[5] - it[4], it[3]);
+          dm.updateMatrix(); im.setMatrixAt(i, dm.matrix);
+          im.setColorAt(i, miniColor(it[6], lit));
+        });
+        im.instanceMatrix.needsUpdate = true; if (im.instanceColor) im.instanceColor.needsUpdate = true;
+        im.castShadow = lit && !dim; im.receiveShadow = true;
+        parent.add(im);
+      });
+    }
     const planTex = {}, planMats = {};
     ['sem-sacada', 'com-sacada'].forEach(function (tipo) {
       planCanvas(tipo, function (c) {
@@ -631,15 +666,8 @@
         const plan = new THREE.Mesh(new THREE.PlaneGeometry(w, d), planMat(tp, st, dim));
         plan.rotation.x = -Math.PI / 2; plan.position.y = 0.016; plan.renderOrder = 2;
         inner.add(plan);
-        // maquete do apartamento: paredes da planta levantadas (acesas se disponível, apagadas se reservado ou vendido)
-        const wm = wallMats[(st === 'livre' ? 'on' : 'off') + (dim ? 'Dim' : '')];
-        planWalls(tp).forEach(function (q) {
-          const m = new THREE.Mesh(wallGeo, wm);
-          m.scale.set(Math.max(0.02, (q.u1 - q.u0) * w), q.h, Math.max(0.02, (q.v1 - q.v0) * d));
-          m.position.set(((q.u0 + q.u1) / 2 - 0.5) * w, 0.016 + q.h / 2, ((q.v0 + q.v1) / 2 - 0.5) * d);
-          m.receiveShadow = true; m.castShadow = st === 'livre' && !dim;
-          inner.add(m);
-        });
+        // maquete do apartamento: paredes e móveis da planta em 3D (acesos se disponível, apagados se reservado ou vendido)
+        miniModel(inner, tp, w, d, st === 'livre', dim);
         const info = { unit: pos, torre: tw.T.id, andar: andar, status: st, tipo: tp, dim: dim, baseY: ug.position.y, base: base, plan: plan,
           front: r.front, half: d / 2 };
         base.userData = info; plan.userData = info; ug.userData = info;
@@ -752,7 +780,7 @@
       amb.intensity = night ? 0.22 : 0;
       facadeMats.forEach(function (m) { m.emissiveIntensity = night ? 1.35 : 0.62; });
       M.gold.emissiveIntensity = night ? 0.55 : 0;
-      wallMats.on.emissiveIntensity = night ? 0.5 : 0.22;
+      miniMats.on.emissiveIntensity = night ? 0.32 : 0.12;
       if (sel) applySelection();
       lamps.forEach(function (l) { l.intensity = night ? 1.6 : 0; });
       renderer.toneMappingExposure = night ? 1.12 : 1.02;

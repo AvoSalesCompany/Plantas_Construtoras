@@ -207,6 +207,30 @@
     img.onerror = function () { e.fail = true; e.wait.splice(0).forEach(function (f) { f(null); }); };
     img.src = 'apartamento/' + P.meta.img;
   }
+  // paredes da planta para a maquete do andar aberto: corte a 1,25 m, vãos de porta abertos, janelas na altura do peitoril
+  const WALL_CUT = 1.25, wallCache = {};
+  function planWalls(tipo) {
+    if (wallCache[tipo]) return wallCache[tipo];
+    const P = window.PLANS && window.PLANS[tipo], out = [];
+    if (!P) return out;
+    const ox = P.origin[0], oy = P.origin[1], W = P.extent[0] - ox, H = P.extent[1] - oy;
+    const push = function (x0, y0, x1, y1, h) { if (x1 - x0 > 0.5 && y1 - y0 > 0.5 && h > 0.01) out.push({ u0: (x0 - ox) / W, v0: (y0 - oy) / H, u1: (x1 - ox) / W, v1: (y1 - oy) / H, h: h }); };
+    P.walls.forEach(function (w) {
+      const x1 = w.r[0], y1 = w.r[1], x2 = w.r[2], y2 = w.r[3], horiz = (x2 - x1) >= (y2 - y1);
+      const seg = function (a, b, h) { if (horiz) push(a, y1, b, y2, h); else push(x1, a, x2, b, h); };
+      let cur = horiz ? x1 : y1;
+      (w.open || []).slice().sort(function (p, q) { return p.a - q.a; }).forEach(function (o) {
+        seg(cur, o.a, WALL_CUT);
+        if (o.kind === 'win') seg(o.a, o.b, Math.min(P.windows[o.win].sill, WALL_CUT));
+        cur = o.b;
+      });
+      seg(cur, horiz ? x2 : y2, WALL_CUT);
+    });
+    if (P.shaft) push(P.shaft[0], P.shaft[1], P.shaft[2], P.shaft[3], WALL_CUT);
+    wallCache[tipo] = out;
+    return out;
+  }
+
   // como a planta é vista de cima em cada posição: a fachada (topo da imagem) fica para fora e, nos aptos de canto,
   // a sacada fica na ponta do prédio (dois dos quatro cantos são o espelho da planta); os de meio só giram, sem espelhar
   function planPose(pos) {
@@ -547,7 +571,14 @@
       return unitMats[key];
     }
     const plateMats = { slab: std({ color: 0xE9EAEC }), corridor: std({ color: 0xF7F7F5 }), shaft: std({ color: 0x41464F }) };
-    const PLAN_TINT = { livre: 0xFFFFFF, reservado: 0xF4C84E, vendido: 0x2A2F3A };
+    const PLAN_TINT = { livre: 0xFFFFFF, reservado: 0x272C37, vendido: 0x272C37 };
+    const wallMats = {
+      on: std({ color: 0xF3F1EC, roughness: 0.85, emissive: new THREE.Color(0xFFE2B0), emissiveIntensity: 0.28 }),
+      off: std({ color: 0x2C313C, roughness: 0.9 }),
+      onDim: std({ color: 0xF3F1EC, roughness: 0.85, transparent: true, opacity: 0.25, depthWrite: false }),
+      offDim: std({ color: 0x2C313C, roughness: 0.9, transparent: true, opacity: 0.25, depthWrite: false })
+    };
+    const wallGeo = new THREE.BoxGeometry(1, 1, 1);
     const planTex = {}, planMats = {};
     ['sem-sacada', 'com-sacada'].forEach(function (tipo) {
       planCanvas(tipo, function (c) {
@@ -596,9 +627,19 @@
         const ug = new THREE.Group(); ug.position.set((r.x0 + r.x1) / 2, y + 0.3, (r.z0 + r.z1) / 2); g.add(ug);
         const base = new THREE.Mesh(new THREE.BoxGeometry(w, 0.12, d), unitMat(st, dim)); base.position.y = -0.05; base.receiveShadow = true; ug.add(base);
         const wrap = new THREE.Group(); if (pose.front) wrap.rotation.y = Math.PI; ug.add(wrap);
+        const inner = new THREE.Group(); if (pose.mirror) inner.scale.x = -1; wrap.add(inner);
         const plan = new THREE.Mesh(new THREE.PlaneGeometry(w, d), planMat(tp, st, dim));
-        plan.rotation.x = -Math.PI / 2; plan.position.y = 0.016; if (pose.mirror) plan.scale.x = -1; plan.renderOrder = 2;
-        wrap.add(plan);
+        plan.rotation.x = -Math.PI / 2; plan.position.y = 0.016; plan.renderOrder = 2;
+        inner.add(plan);
+        // maquete do apartamento: paredes da planta levantadas (acesas se disponível, apagadas se reservado ou vendido)
+        const wm = wallMats[(st === 'livre' ? 'on' : 'off') + (dim ? 'Dim' : '')];
+        planWalls(tp).forEach(function (q) {
+          const m = new THREE.Mesh(wallGeo, wm);
+          m.scale.set(Math.max(0.02, (q.u1 - q.u0) * w), q.h, Math.max(0.02, (q.v1 - q.v0) * d));
+          m.position.set(((q.u0 + q.u1) / 2 - 0.5) * w, 0.016 + q.h / 2, ((q.v0 + q.v1) / 2 - 0.5) * d);
+          m.receiveShadow = true; m.castShadow = st === 'livre' && !dim;
+          inner.add(m);
+        });
         const info = { unit: pos, torre: tw.T.id, andar: andar, status: st, tipo: tp, dim: dim, baseY: ug.position.y, base: base, plan: plan,
           front: r.front, half: d / 2 };
         base.userData = info; plan.userData = info; ug.userData = info;
@@ -660,7 +701,7 @@
         tw.units.forEach(function (ug) { if (!ug.userData.dim) { pickables.push(ug.userData.base); pickables.push(ug.userData.plan); } });
         setLabels(tw.units.map(function (ug) {
           const u = ug.userData, edge = u.front ? u.half - 0.7 : -u.half + 0.7;      // número perto da fachada, para não cobrir a planta
-          return { pos: u.unit, num: String(sel.andar * 100 + u.unit), status: u.status, dim: u.dim, p: new THREE.Vector3(tw.T.x + ug.position.x, ug.position.y + 0.3, tw.T.z + ug.position.z + edge) };
+          return { pos: u.unit, num: String(sel.andar * 100 + u.unit), status: u.status, dim: u.dim, p: new THREE.Vector3(tw.T.x + ug.position.x, ug.position.y + WALL_CUT + 0.25, tw.T.z + ug.position.z + edge) };
         }));
         refreshUnitLook();
       } else {
@@ -711,6 +752,8 @@
       amb.intensity = night ? 0.22 : 0;
       facadeMats.forEach(function (m) { m.emissiveIntensity = night ? 1.35 : 0.62; });
       M.gold.emissiveIntensity = night ? 0.55 : 0;
+      wallMats.on.emissiveIntensity = night ? 0.5 : 0.22;
+      if (sel) applySelection();
       lamps.forEach(function (l) { l.intensity = night ? 1.6 : 0; });
       renderer.toneMappingExposure = night ? 1.12 : 1.02;
       dirty = true;

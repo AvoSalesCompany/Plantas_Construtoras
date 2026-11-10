@@ -216,7 +216,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .plate .pl-u.is-livre .pl-base { fill: var(--livre); }
 .plate .pl-u.is-reservado .pl-base { fill: var(--reservado); }
 .plate .pl-u .pl-tint { fill: transparent; pointer-events: none; }
-.plate .pl-u.is-reservado .pl-tint { fill: #F2C230; opacity: .42; }
+.plate .pl-u.is-reservado .pl-tint { fill: #0B0F1C; opacity: .68; }
 .plate .pl-u.is-vendido .pl-tint { fill: #0B0F1C; opacity: .68; }
 .plate .pl-u .pl-frame { fill: none; stroke: transparent; stroke-width: 2; }
 .plate .pl-u:hover .pl-frame, .plate .pl-u:focus-visible .pl-frame { stroke: var(--gold); }

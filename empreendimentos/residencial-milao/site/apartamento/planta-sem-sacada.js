@@ -88,8 +88,8 @@ window.PLANS['sem-sacada'] = {
       view: { at: [385, 688], to: [440, 430] }, lights: [[430, 560]],
       rects: [[315, 413, 440, 491], [315, 491, 539, 712], [330, 712, 437, 728]] }
   ],
-  // parede de destaque azul-marinho (igual às almofadas) na sala, atrás da árvore de Natal
-  accentWalls: [{ dir: 'W', at: 836, from: 289, to: 491 }],
+  // parede de destaque amarela na sala, atrás da mesa de jantar (como na planta decorada)
+  accentWalls: [{ dir: 'W', at: 836, from: 282, to: 491, m: 'accentYellow' }],
   switches: { d1: [299, 406, 'W'], d2: [438, 397, 'N'], banho: [315, 662, 'E'], circ: [449, 712, 'N'], estar: [584, 400, 'E'], coz: [741, 558, 'W'] },
   shaftRooms: { d1: [48, 66, 299, 522], d2: [315, 66, 567, 397], estar: [584, 98, 836, 491] },
   // zonas de luz: 0 dorm.1, 1 vão d1, 2 dorm.2, 3 vão d2, 4 banho, 5 vão banho, 6–9 sala/cozinha/circulação
@@ -99,9 +99,10 @@ window.PLANS['sem-sacada'] = {
   facadeWins: [['d1', 110, 237, 48, 'N'], ['d2', 378, 506, 48, 'N'], ['estar', 630, 789, 80, 'N'], ['coz', 570, 634, 757, 'E']],
   poses: {
     cama1: { kind: 'lie', label: 'Deitar na cama', at: [100, 206], y: 0.80, yaw: 90, pitch: 0.24, stand: [180, 336] },
+    cama2: { kind: 'lie', label: 'Deitar na cama', at: [361, 100], y: 0.76, yaw: 0, pitch: 0.24, stand: [443, 270] },
+    cama3: { kind: 'lie', label: 'Deitar na cama', at: [523, 100], y: 0.76, yaw: 0, pitch: 0.24, stand: [443, 270] },
     sofa: { kind: 'sit', label: 'Sentar no sofá', at: [655, 212], y: 1.12, yaw: 90, pitch: 0.05, stand: [742, 212] }
   },
   toilet: { c: [186.5, 664], tank: [167, 689, 207, 712], btn: [187, 700] },
-  console: { xf: 808, xb: 831, padX: 815 },
-  mirrorWall: { x0: 429, x1: 583.5, at: 413 }
+  console: { xf: 808, xb: 831, padX: 815 }
 };

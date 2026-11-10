@@ -69,7 +69,7 @@
       const area = document.getElementById('factArea'); if (area) area.textContent = P.meta.area + ' m²';
       const tot = document.getElementById('roomsTotal'); if (tot) tot.textContent = P.meta.comodos + ' m²';
       const note = document.querySelector('.rooms .note');
-      if (note) note.innerHTML = note.innerHTML.replace('5º andar', APT_FLOOR + 'º andar').replace('pisca-pisca da árvore de Natal, ', P.id === 'sem-sacada' ? 'pisca-pisca da árvore de Natal, ' : 'porta da sacada, ');
+      if (note) note.innerHTML = note.innerHTML.replace('5º andar', APT_FLOOR + 'º andar').replace('camas e sofá', P.id === 'com-sacada' ? 'porta da sacada, camas e sofá' : 'camas e sofá');
       document.title = 'Milão ' + (P.id === 'com-sacada' ? 'Com' : 'Sem') + ' Sacada 3D';
       const cv = document.getElementById('c'); if (cv) cv.setAttribute('aria-label', 'Modelo 3D interativo do ' + P.meta.titulo.toLowerCase() + '. Arraste para girar.');
     })();
@@ -572,6 +572,7 @@
     const M = {
       paint: std('#F2F1ED', { roughness: 0.93 }),
       accentWall: std('#0E1A4A', { roughness: 0.9 }),
+      accentYellow: std('#E3B62E', { roughness: 0.9 }),
       cap: std('#1C1E23', { roughness: 0.95, env: 0.15 }),
       slab: std('#B5B4AF', { roughness: 0.9 }),
       lam: std('#ffffff', { map: texLam, roughness: 0.6, env: 0.45 }),
@@ -2071,7 +2072,6 @@
       PB([176, 264, 226, 268], 0.36, 0.603, M.navy, bed1, { r: 0.004 });
       poseTag(bed1, 'cama1');
       tvUnit([272, 104, 278, 236], 1.00, 1.72, [272, 107, 233, 1.035, 1.685], d1);
-      airConditioner(278, 170, 0.82, d1);
       unit([35, 297, 87, 476], 'E', Object.assign({ n: 3, doorTo: (425 - 297) / (476 - 297), sections: [{ from: 0, to: 0.44, kind: 'hang' }, { from: 0.44, to: 1, kind: 'shelves' }] }, robe), d1);
       unit([87, 425, 188, 476], 'N', Object.assign({ n: 2, sections: [{ from: 0, to: 0.65, kind: 'hang' }, { from: 0.65, to: 1, kind: 'shelves' }] }, robe), d1);
 
@@ -2117,9 +2117,7 @@
       cylP(700, 246, 0.045, 0.045, 0.42, 0.60, M.ceramic, es, { seg: 20 });
       sphP(700, 246, 0.11, 0.70, dried, es, 0.8);
       PB([757, 152, 788, 358], 0.36, 0.53, M.white, es, { r: 0.008, block: true });
-      estarTv = tvUnit([782, 182, 789, 329], 0.848, 1.672, [782, 183, 328, 0.855, 1.665], es, true);   // 65 polegadas
-      gameConsole(255, es);
-      airConditioner(790, 255, 0.95, es);
+      estarTv = tvUnit([782, 189, 789, 321], 0.89, 1.63, [782, 190, 320, 0.897, 1.623], es);   // ~58 polegadas, como na planta
       PB([762, 160, 782, 180], 0.53, 0.72, M.black, es, { r: 0.006 });
       PB([762, 336, 782, 356], 0.53, 0.72, M.black, es, { r: 0.006 });
       plant(772, 208, 0.045, 0.53, 0.11, es);
@@ -2236,14 +2234,23 @@
       PB([188, 297, 240, 301], 0.36, 0.603, M.navy, bed1, { r: 0.004 });
       poseTag(bed1, 'cama1');
       tvUnit([290, 135, 297, 268], 1.00, 1.72, [290, 139, 264, 1.035, 1.685], d1);
-      airConditioner(299, 201.5, 0.82, d1);
       const robe = { h0: 0, h1: 2.20, mat: M.wardrobe, inner: M.innerWhite, plinth: 0.07, handle: 'v', handleY: 1.05, openL: 'Abrir guarda-roupa', close: 'Fechar guarda-roupa' };
       unit([48, 343, 100, 522], 'E', Object.assign({ n: 3, doorTo: (470 - 343) / (522 - 343), sections: [{ from: 0, to: 0.44, kind: 'hang' }, { from: 0.44, to: 1, kind: 'shelves' }] }, robe), d1);
       unit([100, 470, 203, 522], 'N', Object.assign({ n: 2, sections: [{ from: 0, to: 0.65, kind: 'hang' }, { from: 0.65, to: 1, kind: 'shelves' }] }, robe), d1);
 
-      /* Dormitório 2 */
+      /* Dormitório 2: duas camas de solteiro com a cabeceira na janela, criado-mudo no meio, tapete listrado e roupeiro na parede da porta */
       const d2 = group(root);
-      unit([510, 66, 567, 397], 'W', Object.assign({ n: 0, sliding: 6, sections: [{ from: 0, to: 0.34, kind: 'hang' }, { from: 0.34, to: 0.66, kind: 'shelves' }, { from: 0.66, to: 1, kind: 'hang' }] }, robe), d2);
+      rug([332, 92, 560, 297], 'stripe', d2);
+      const bedA = group(d2), bedB = group(d2);
+      singleBed([318, 68, 405, 240], bedA);
+      singleBed([481, 68, 566, 240], bedB);
+      poseTag(bedA, 'cama2'); poseTag(bedB, 'cama3');
+      PB([406, 67, 480, 104], 0, 0.55, M.white, d2, { r: 0.008, block: true });
+      tableLamp(439, 86, 0.55, d2);
+      PB([450, 74, 477, 95], 0.55, 0.565, M.laptop, d2, { r: 0.004 });
+      PB([451, 75, 476, 94], 0.565, 0.568, M.screen, d2, { cast: false, noDbg: true });
+      PB([408, 82, 417, 94], 0.55, 0.56, M.black, d2, { r: 0.003 });
+      unit([429, 343, 567, 397], 'N', Object.assign({ n: 3, sections: [{ from: 0, to: 0.5, kind: 'hang' }, { from: 0.5, to: 1, kind: 'shelves' }] }, robe), d2);
 
       /* Estar / Jantar */
       const es = group(root);
@@ -2268,12 +2275,16 @@
       PB([806, 108, 833, 282], 0.36, 0.53, M.white, es, { r: 0.008 });
       PB([785, 156, 826, 214], 0, 0.34, M.pouf, es, { r: 0.05, block: true });
       PB([785, 219, 826, 276], 0, 0.34, M.pouf, es, { r: 0.05, block: true });
-      estarTv = tvUnit([829, 125.4, 835, 278.6], 0.848, 1.672, [829, 126.14, 277.86, 0.855, 1.665], es, true);   // 65 polegadas
-      gameConsole(195, es);
-      airConditioner(836, 202, 0.95, es);
+      estarTv = tvUnit([829, 132, 835, 271], 0.89, 1.63, [829, 132.7, 270.3, 0.897, 1.623], es);   // ~60 polegadas, como na planta
       PB([809, 115, 826, 138], 0.53, 0.57, M.paper, es, { r: 0.004 });
       plant(816, 273, 0.055, 0.53, 0.13, es);
-      christmasTree(778, 434, es);
+      // mesa de jantar de 4 lugares em frente à parede amarela, com vaso de flores vermelhas
+      PB([697, 367, 787, 490], 0.72, 0.75, M.tableTop, es, { r: 0.006, block: true });
+      [[702, 372], [782, 372], [702, 485], [782, 485]].forEach(function (l) { cylP(l[0], l[1], 0.02, 0.02, 0, 0.72, M.legDark, es, { seg: 10 }); });
+      chair([655, 373, 700, 419], 'W', es); chair([655, 433, 700, 479], 'W', es);
+      chair([784, 373, 829, 419], 'E', es); chair([784, 433, 829, 479], 'E', es);
+      cylP(742, 428, 0.05, 0.05, 0.75, 0.86, M.black, es, { seg: 18 });
+      [[0, 0], [9, -6], [-8, 5], [6, 8], [-6, -8], [11, 4]].forEach(function (f, i) { sphP(742 + f[0], 428 + f[1], 0.035 + (i % 2) * 0.01, 0.90 + (i % 3) * 0.025, i % 3 ? M.flower : M.leaf2, es); });
 
       /* Cozinha / Área de serviço */
       const kz = group(root);

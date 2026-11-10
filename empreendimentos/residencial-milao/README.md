@@ -58,12 +58,13 @@ As duas plantas foram medidas pixel a pixel e calibradas pelas cotas impressas:
 | Com sacada (canto) | `planta-com-sacada.js` | 101,9 px/m | 2,39 · 2,36 · 4,34 · 3,14 · 2,25 · 2,61 · 1,46 · 5,09 |
 
 As duas têm giro 360°, vista de planta com a planta oficial sobreposta, visita em primeira pessoa com colisão e câmera livre.
-Dá para abrir portas, roupeiros, armários e geladeira, abrir janelas e baixar persianas, acender as luzes (interruptor ao lado da porta ou no plafon), abajures, TVs, ar-condicionado, videogame, torneiras, tanque, chuveiro e fogão, abrir o box, dar descarga e deitar ou sentar.
+Dá para abrir portas, roupeiros, armários e geladeira, abrir janelas e baixar persianas, acender as luzes (interruptor ao lado da porta ou no plafon), abajures, TVs, torneiras, tanque, chuveiro e fogão, abrir o box, dar descarga e deitar ou sentar.
 A luz de cada cômodo não atravessa as paredes, e a claridade muda com janela, persiana e porta.
 
-Só na planta com sacada: porta de correr da sala para a sacada (fechada, não dá para passar), guarda-corpo de vidro, sacadas dos andares de baixo vistas de cima, janela basculante no banho, cozinha americana com balcão e banquetas.
+Os móveis das duas seguem a planta decorada oficial da Baliza, sem personalização:
 
-A decoração da sem sacada segue os pedidos do cliente: parede de destaque azul-marinho, TV de 65" na sala, videogame na estante, ar-condicionado sobre as TVs, árvore de Natal, espelhos que refletem e dormitório 2 só com o roupeiro. A com sacada segue a planta decorada da Baliza, com os mesmos itens funcionando.
+- **Sem sacada:** cama de casal com TV na parede, roupeiro em L, duas camas de solteiro com criado-mudo e tapete listrado no dormitório 2, sofá, rack com TV, mesa de jantar de 4 lugares e a parede amarela da sala.
+- **Com sacada:** cama de casal com TV, roupeiro em L, cama de solteiro e cantinho infantil no dormitório 2, sofá, mesa de centro oval, rack com TV, mesa de 4 lugares, cozinha americana com 3 banquetas, porta de correr para a sacada (fechada, não dá para passar), guarda-corpo de vidro, sacadas dos andares de baixo vistas de cima e janela basculante no banho.
 
 Parâmetros do endereço: `apartamento/index.html#tipo=com-sacada&andar=8&apto=801&torre=A` (`tipo` escolhe a planta; a vista da janela fica na altura do andar). Com `embed=1`, a maquete esconde os próprios botões e o site do prédio controla a visita por mensagens (`apt:cmd`, `apt:room`; ela responde `apt:ready`, `apt:state`, `apt:error`).
 

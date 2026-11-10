@@ -275,7 +275,7 @@
       document.querySelectorAll('#viewApto .tgl').forEach(function (b) { b.setAttribute('aria-pressed', String(!!tg[b.dataset.cmd])); b.disabled = !!d.imm && (b.dataset.cmd === 'tRotate' || b.dataset.cmd === 'tWalls'); });
       document.querySelectorAll('#aptoComodos .room-btn').forEach(function (b) { b.setAttribute('aria-current', String(!!d.imm && d.room === b.dataset.room)); });
       $('aptoDica').textContent = d.imm
-        ? 'Clique nas portas, luzes e interruptores, janelas e persianas, TVs, ar-condicionado, torneiras, chuveiro, fogão, privada, camas e sofá.'
+        ? 'Clique nas portas, luzes e interruptores, janelas e persianas, TVs, torneiras, chuveiro, fogão, privada, camas e sofá.'
         : 'Toque num cômodo para entrar nele, ou em Visitar para andar pelo apartamento.';
     } else if (d.type === 'apt:error') {
       cortina(true, undefined, undefined, 'A maquete não abriu neste navegador. Ela precisa de WebGL.');

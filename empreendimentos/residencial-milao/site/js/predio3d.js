@@ -61,22 +61,20 @@
     return [];
   }
 
-  // desenha uma janela: moldura, vidro com reflexo do céu e, no mapa de emissão, a luz acesa
-  function drawWindow(g, e, x, y, w, h, lit, warm) {
+  // desenha uma janela (moldura e vidro com reflexo do céu) e guarda onde ela está, para acender depois conforme o apartamento
+  function drawWindow(g, wins, x, y, w, h, info) {
     g.fillStyle = C.frame; g.fillRect(x - 2, y - 2, w + 4, h + 4);
     const gr = g.createLinearGradient(0, y, 0, y + h);
     gr.addColorStop(0, C.glassTop); gr.addColorStop(1, C.glassBot);
     g.fillStyle = gr; g.fillRect(x, y, w, h);
     g.fillStyle = 'rgba(255,255,255,.55)'; g.fillRect(x + w / 2 - 1, y, 2, h);           // caixilho
-    if (lit) { e.fillStyle = warm; e.fillRect(x, y, w, h); e.fillStyle = 'rgba(0,0,0,.35)'; e.fillRect(x + w / 2 - 1, y, 2, h); }
+    if (wins) wins.push(Object.assign({ x: x, y: y, w: w, h: h }, info));
   }
 
   function facadeLong(seed, isFront) {
     const W = Math.round(L * PXM), H = ROW * LEVELS;
-    const cm = canvas(W, H), ce = canvas(W, H), g = cm.getContext('2d'), e = ce.getContext('2d');
-    const R = rng(seed);
+    const cm = canvas(W, H), g = cm.getContext('2d'), wins = [];
     const rx = function (m) { return (m + HL) * PXM; };
-    e.fillStyle = '#000'; e.fillRect(0, 0, W, H);
     for (let lv = 0; lv < LEVELS; lv++) {
       const y0 = H - (lv + 1) * ROW;
       const ry = function (m) { return y0 + ROW - m * PXM; };
@@ -91,21 +89,21 @@
           g.fillStyle = '#20242B'; g.fillRect(x0 - 3, ry(2.5) - 3, w + 6, 2.5 * PXM + 3);
           const gr = g.createLinearGradient(0, ry(2.5), 0, ry(0)); gr.addColorStop(0, '#6E8296'); gr.addColorStop(1, '#2C3440');
           g.fillStyle = gr; g.fillRect(x0, ry(2.5), w, 2.5 * PXM);
-          e.fillStyle = 'rgba(255,214,160,.9)'; e.fillRect(x0, ry(2.5), w, 2.5 * PXM);
+          wins.push({ x: x0, y: ry(2.5), w: w, h: 2.5 * PXM, lv: 0, kind: 'lobby' });
         }
       }
       BAYS.forEach(function (b, bi) {
         if (b[0] === 'faixa' || b[0] === 'nucleo') {         // janelinhas de serviço e da escada
           const cx = (b[1] + b[2]) / 2, w = 0.55 * PXM, h = 0.65 * PXM;
           if (lv === 0 && b[0] === 'nucleo' && isFront) return;
-          drawWindow(g, e, rx(cx) - w / 2, ry(2.05), w, h, R() < 0.35, 'rgba(255,226,180,.85)');
+          drawWindow(g, wins, rx(cx) - w / 2, ry(2.05), w, h, { lv: lv, b: b, kind: b[0] === 'nucleo' ? 'core' : 'service' });
           return;
         }
         if (b[0] === 'canto' && lv > 0) {                    // sacada recuada com guarda-corpo de vidro
           const lx0 = b[3] === 'L' ? b[1] : b[2] - LOGGIA, lx1 = lx0 + LOGGIA;
           g.fillStyle = C.loggia; g.fillRect(rx(lx0) + 2, ry(2.55), (lx1 - lx0) * PXM - 4, 2.4 * PXM);
           const door = rx(lx0) + 0.35 * PXM, dw = (LOGGIA - 0.7) * PXM;
-          drawWindow(g, e, door, ry(2.2), dw, 2.0 * PXM, R() < 0.5, 'rgba(255,212,150,.9)');
+          drawWindow(g, wins, door, ry(2.2), dw, 2.0 * PXM, { lv: lv, b: b, kind: 'unit' });
           g.fillStyle = 'rgba(214,226,236,.55)'; g.fillRect(rx(lx0), ry(1.1), LOGGIA * PXM, 0.95 * PXM);
           g.fillStyle = '#EDEFF2'; g.fillRect(rx(lx0), ry(1.1) - 2, LOGGIA * PXM, 3);
         }
@@ -115,19 +113,42 @@
             const side = (wi + lv) % 2 ? 1 : -1, pw = 0.85 * PXM;
             g.fillStyle = C.navy; g.fillRect(side > 0 ? x + w + 2 : x - 2 - pw, y - 0.15 * PXM, pw, h + 0.3 * PXM);
           }
-          drawWindow(g, e, x, y, w, h, R() < 0.48, R() < 0.5 ? 'rgba(255,214,160,.92)' : 'rgba(255,236,200,.8)');
+          drawWindow(g, wins, x, y, w, h, { lv: lv, b: b, kind: lv > 0 ? 'unit' : 'ground' });
         });
       });
       g.fillStyle = C.slab; g.fillRect(0, y0 + ROW - 3, W, 3);
     }
-    return { map: cm, emi: ce };
+    return { map: cm, wins: wins, W: W, H: H };
+  }
+
+  // a qual apartamento (1–6 na frente, 7–12 nos fundos) pertence um trecho da fachada; a face dos fundos é vista espelhada
+  function unitOfBay(b, back) {
+    if (!b || b[0] === 'nucleo') return 0;
+    const a = back ? -b[2] : b[1], z = back ? -b[1] : b[2];
+    let k = 0;
+    if (b[0] === 'faixa') k = a < 0 ? 1 : 6;                 // janelinha de serviço do poço: do apto de canto ao lado
+    else Object.keys(UNIT_X).forEach(function (kk) { if (Math.abs(UNIT_X[kk][0] - a) < 0.01 && Math.abs(UNIT_X[kk][1] - z) < 0.01) k = +kk; });
+    return k ? (back ? 13 - k : k) : 0;
+  }
+  // luzes da fachada de uma torre: apartamento disponível = janelas acesas; reservado ou vendido = tudo apagado
+  const LIT = 'rgb(255,196,118)';
+  function facadeLights(f, torre, back, statusOf) {
+    const sc = 0.5, c = canvas(Math.round(f.W * sc), Math.round(f.H * sc)), e = c.getContext('2d');
+    e.fillStyle = '#000'; e.fillRect(0, 0, c.width, c.height);
+    f.wins.forEach(function (w) {
+      let lit = false;
+      if (w.kind === 'lobby') lit = true;
+      else if ((w.kind === 'unit' || w.kind === 'service') && w.lv > 0) { const pos = unitOfBay(w.b, back); lit = !!pos && statusOf(torre, w.lv, pos) === 'livre'; }
+      if (!lit) return;
+      e.fillStyle = LIT; e.fillRect(w.x * sc, w.y * sc, w.w * sc, w.h * sc);
+      e.fillStyle = 'rgba(0,0,0,.4)'; e.fillRect((w.x + w.w / 2) * sc - 1, w.y * sc, 2, w.h * sc);
+    });
+    return c;
   }
 
   function facadeShort(seed) {
     const W = Math.round(D * PXM), H = ROW * LEVELS;
-    const cm = canvas(W, H), ce = canvas(W, H), g = cm.getContext('2d'), e = ce.getContext('2d');
-    const R = rng(seed);
-    e.fillStyle = '#000'; e.fillRect(0, 0, W, H);
+    const cm = canvas(W, H), g = cm.getContext('2d');
     const rx = function (m) { return m * PXM; };
     for (let lv = 0; lv < LEVELS; lv++) {
       const y0 = H - (lv + 1) * ROW;
@@ -139,10 +160,10 @@
       [3.6, 11.4].forEach(function (cx, wi) {
         if (((wi + lv) % 3) === 0) { g.fillStyle = C.navy; g.fillRect(rx(cx) - 0.45 * PXM, ry(2.35), 0.9 * PXM, 1.45 * PXM); }
       });
-      drawWindow(g, e, rx(7.5) - 0.3 * PXM, ry(2.05), 0.6 * PXM, 0.65 * PXM, R() < 0.4, 'rgba(255,230,190,.85)');
+      drawWindow(g, null, rx(7.5) - 0.3 * PXM, ry(2.05), 0.6 * PXM, 0.65 * PXM);
       g.fillStyle = C.slab; g.fillRect(0, y0 + ROW - 3, W, 3);
     }
-    return { map: cm, emi: ce };
+    return { map: cm };
   }
 
   function crownLong() {
@@ -301,15 +322,17 @@
 
     /* torres */
     const facFront = facadeLong(11, true), facBack = facadeLong(29, false), facEndA = facadeShort(41), facEndB = facadeShort(53);
-    const mk = function (f) { return { map: tex(f.map), emi: tex(f.emi) }; };
-    const T_FRONT = mk(facFront), T_BACK = mk(facBack), T_ENDA = mk(facEndA), T_ENDB = mk(facEndB);
+    const mapFront = tex(facFront.map), mapBack = tex(facBack.map);
+    const LIGHTS = {};
+    TOWERS.forEach(function (T) { LIGHTS[T.id] = { front: tex(facadeLights(facFront, T.id, false, statusOf)), back: tex(facadeLights(facBack, T.id, true, statusOf)) }; });
     const facadeMats = [];
-    const facadeMat = function (t) {
-      const m = std({ map: t.map, emissiveMap: t.emi, emissive: new THREE.Color(0xffffff), emissiveIntensity: 0, roughness: 0.78 });
-      facadeMats.push(m); return m;
+    const facadeMat = function (map, emi) {
+      const m = std(emi ? { map: map, emissiveMap: emi, emissive: new THREE.Color(0xffffff), emissiveIntensity: 0, roughness: 0.78 } : { map: map, roughness: 0.78 });
+      if (emi) facadeMats.push(m);
+      return m;
     };
     const M = {
-      front: facadeMat(T_FRONT), back: facadeMat(T_BACK), endA: facadeMat(T_ENDA), endB: facadeMat(T_ENDB),
+      endA: facadeMat(tex(facEndA.map)), endB: facadeMat(tex(facEndB.map)),
       roof: std({ color: 0x9FA3A9, roughness: 0.95 }),
       crownL: std({ map: tex(crownLong()) }), crownS: std({ map: tex(crownShort()) }),
       graphite: std({ color: 0x3A3F49, roughness: 0.8 }),
@@ -334,7 +357,7 @@
     const pickables = [];
     TOWERS.forEach(function (T, ti) {
       const root = new THREE.Group(); root.position.set(T.x, 0, T.z); scene.add(root);
-      const mats = ti === 0 ? [M.endA, M.endB, M.roof, M.roof, M.front, M.back] : [M.endB, M.endA, M.roof, M.roof, M.back, M.front];
+      const mats = [ti === 0 ? M.endA : M.endB, ti === 0 ? M.endB : M.endA, M.roof, M.roof, facadeMat(mapFront, LIGHTS[T.id].front), facadeMat(mapBack, LIGHTS[T.id].back)];
       const slices = [];
       for (let lv = 0; lv < LEVELS; lv++) {
         const m = new THREE.Mesh(SLICE_GEOS[lv], mats);
@@ -633,7 +656,7 @@
       sun.intensity = night ? 0.22 : 1.25;
       sun.color.setHex(night ? 0x9FB2FF : 0xFFF2DE);
       amb.intensity = night ? 0.22 : 0;
-      facadeMats.forEach(function (m) { m.emissiveIntensity = night ? 1.15 : 0; });
+      facadeMats.forEach(function (m) { m.emissiveIntensity = night ? 1.35 : 0.62; });
       M.gold.emissiveIntensity = night ? 0.55 : 0;
       lamps.forEach(function (l) { l.intensity = night ? 1.6 : 0; });
       renderer.toneMappingExposure = night ? 1.12 : 1.02;

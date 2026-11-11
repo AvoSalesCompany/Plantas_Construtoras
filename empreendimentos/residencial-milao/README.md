@@ -56,7 +56,9 @@ A disponibilidade (disponível, reservado, vendido) é ilustrativa e sempre a me
 Montado a partir da imagem de satélite da obra (Rua Marieta Fialho Blessmann, Feitoria) e das fotomontagens e tours da Baliza, nas proporções reais, mas sem levantamento topográfico:
 
 - **portaria** com o pilar MILÃO, marquise escura com testeira azul, guarita envidraçada, portão de carros e de pedestres, **de frente para a Torre A** (o acesso de carros sai do portão direto na entrada dela);
-- rua interna com **estacionamento descoberto** dos dois lados (vagas com faixa amarela, carros em metade delas) e faixas de pedestre na frente das entradas;
+- rua interna com **estacionamento descoberto** dos dois lados (vagas com faixa amarela, carros em metade delas) e faixas de pedestre de calçada a calçada na frente das entradas, da pracinha e da piscina (listras no sentido da rua);
+- **estacionamento dos fundos**, atrás das torres: corredor com uma fileira de vagas junto ao muro e outra atrás das torres, ligado à rua interna por uma rua em cada ponta do lote (ao lado da Torre A, junto aos reservatórios, e ao lado da Torre B);
+- o caminho de concreto de cada entrada vai do pórtico até a calçada de tijolinho, que segue contínua na frente das torres;
 - passeio de tijolinho com a faixa azul-marinho junto às torres (render "Rua Interna"), postes e bicicletários;
 - **entrada de cada torre** no recuo do núcleo: pórtico azul-marinho e a letra gigante amarela (A e B), como no render "Acesso"; atrás da porta de vidro automática, o **hall de entrada** com as caixas de correio, um banco e as portas de trás dos dois elevadores (a cabine tem porta dupla: a da frente abre nos andares, a de trás no térreo);
 - **piscina** adulto (1,40 m) e infantil (0,45 m) com tanque de pastilha, faixa escura na linha d'água, luzes embaixo d'água, borda de pedra, deque, espreguiçadeiras, guarda-sóis, ducha, escadinha e cerca de vidro; **salão de festas** ao lado, com a frente de vidro e a faixa azul-marinho no alto (render da piscina), mesas com toalha, cadeiras, luminárias pendentes e balcão da copa;

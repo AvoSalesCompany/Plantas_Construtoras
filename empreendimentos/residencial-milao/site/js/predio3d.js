@@ -283,8 +283,13 @@
      na frente, portaria com o pilar MILÃO de frente para a Torre A, piscina e salão de festas na ponta leste, quiosques,
      pracinha, espaço pet, reservatórios azuis na ponta oeste e mata nativa nos fundos do lote ao sul e a leste.
      Metros; x para leste, z para o sul (a frente das torres). */
-  const LOT = { x0: -85, x1: 66, z0: -14, z1: 62 };
-  const ROAD = { x0: -80, x1: 61, z0: 21, z1: 27 };               // rua interna, entre as duas fileiras de vagas
+  const LOT = { x0: -85, x1: 66, z0: -28, z1: 62 };
+  const ROAD = { x0: -80, x1: 64, z0: 21, z1: 27 };               // rua interna, entre as duas fileiras de vagas
+  // fundos: mais estacionamento atrás das torres (como no site da Baliza), ligado à rua interna por uma rua em cada ponta do lote
+  const BACK = { aisle: [-64.5, -21, 64, -15], rows: [[-64.5, -26, 64, -21], [-56, -15, 56, -10]], links: [[-64.5, -21, -58.5, 21], [58, -21, 64, 21]] };
+  const nearLink = function (x, m) { return BACK.links.some(function (l) { return x > l[0] - (m || 0) && x < l[2] + (m || 0); }); };
+  // faixas de pedestre: em frente às entradas das torres, na pracinha e na piscina (de calçada a calçada)
+  const CROSS = TOWERS.map(function (t) { return t.x; }).concat([-12, 36]);
   const PARK = [[-80, 15.5, 61, 21], [-80, 27, 61, 32.5]];       // vagas de 2,5 m x 5 m (90°)
   const ACCESS = { x0: -33, x1: -26, z0: 27, z1: 62 };           // acesso de carros: do portão (de frente para a Torre A) até a rua interna
   const GATE = { x0: -33, x1: -26, z: 62 };
@@ -302,10 +307,11 @@
     { id: 'pet', name: 'Espaço pet', r: PET },
     { id: 'portaria', name: 'Portaria', r: [-46, 50, -20, 62] },
     { id: 'reservatorios', name: 'Reservatórios', r: RES },
-    { id: 'estacionamento', name: 'Estacionamento', r: [-80, 15.5, 61, 32.5] },
+    { id: 'estacionamento', name: 'Estacionamento', r: [-80, 15.5, 64, 32.5] },
+    { id: 'estacionamento-fundos', name: 'Estacionamento dos fundos', r: [-64.5, -26, 64, -10] },
     { id: 'acesso', name: 'Acesso de carros', r: [ACCESS.x0, ACCESS.z0, ACCESS.x1, ACCESS.z1] }
   ];
-  const SITE = { x0: -112, x1: 92, z0: -52, z1: 98 };            // chão desenhado (o lote e a vizinhança em volta)
+  const SITE = { x0: -112, x1: 92, z0: -66, z1: 98 };            // chão desenhado (o lote e a vizinhança em volta)
   const SITE_PX = 12;
   const SURF = {
     lawn: '#86A766', lawn2: '#7C9E5C', paving: '#D6D1C6', asphalt: '#575A61', asphalt2: '#4C4F56', deck: '#E2D8C6', rubber: '#B85A44', rubber2: '#3E8E6A',
@@ -329,14 +335,14 @@
     rect(SURF.yard, SITE.x0, SITE.z0, SITE.x1, LOT.z0);
     rect(SURF.yard, SITE.x0, LOT.z0, LOT.x0, 78);
     speckle(SITE.x0, SITE.z0, SITE.x1, LOT.z0, 6000, 'rgba(60,80,40,.18)', 'rgba(220,230,180,.15)');
-    rect(SURF.asphalt, SITE.x0, -45, SITE.x1, -38);                 // Rua Gastão (atrás das casas do fundo)
+    rect(SURF.asphalt, SITE.x0, -59, SITE.x1, -52);                 // Rua Gastão (atrás das casas do fundo)
     rect(SURF.asphalt, -101, SITE.z0, -94, SITE.z1);                 // Rua Gustavo Veter
     rect(SURF.asphalt, SITE.x0, 78, -24, 85);                        // Rua Marieta Fialho Blessmann
     rect(SURF.asphalt, ACCESS.x0, LOT.z1, ACCESS.x1, 85);            // chegada ao portão
     g.strokeStyle = 'rgba(240,232,200,.8)'; g.lineWidth = 2; g.setLineDash([3 * SITE_PX, 3 * SITE_PX]);
-    [[SITE.x0, -41.5, SITE.x1, -41.5], [-97.5, SITE.z0, -97.5, SITE.z1], [SITE.x0, 81.5, -24, 81.5]].forEach(function (l) { g.beginPath(); g.moveTo(X(l[0]), Z(l[1])); g.lineTo(X(l[2]), Z(l[3])); g.stroke(); });
+    [[SITE.x0, -55.5, SITE.x1, -55.5], [-97.5, SITE.z0, -97.5, SITE.z1], [SITE.x0, 81.5, -24, 81.5]].forEach(function (l) { g.beginPath(); g.moveTo(X(l[0]), Z(l[1])); g.lineTo(X(l[2]), Z(l[3])); g.stroke(); });
     g.setLineDash([]);
-    rect(SURF.walk, SITE.x0, -38, SITE.x1, -36.5); rect(SURF.walk, SITE.x0, 76.5, -33, 78); rect(SURF.walk, -94, SITE.z0, -92.5, SITE.z1);
+    rect(SURF.walk, SITE.x0, -52, SITE.x1, -50.5); rect(SURF.walk, SITE.x0, 76.5, -33, 78); rect(SURF.walk, -94, SITE.z0, -92.5, SITE.z1);
     // dentro do lote: grama
     rect(SURF.lawn, LOT.x0, LOT.z0, LOT.x1, LOT.z1);
     speckle(LOT.x0, LOT.z0, LOT.x1, LOT.z1, 16000, 'rgba(60,90,40,.14)', 'rgba(200,220,150,.14)');
@@ -351,9 +357,10 @@
     rect(SURF.navy, -80, 14.6, 61, 15.5);
     TOWERS.forEach(function (t) {                                   // a calçada da torre volta a ser lisa junto à fachada
       rect(SURF.walk, t.x - HL - 1.2, t.z - HD - 1.2, t.x + HL + 1.2, t.z + HD + 1.2);
-      rect(SURF.paving, t.x - 3.2, t.z + ENTRY_Z, t.x + 3.2, 15.5);      // chegada à entrada da torre (pelo recuo do núcleo)
+      rect(SURF.paving, t.x - 3.2, t.z + ENTRY_Z, t.x + 3.2, 9.5);       // chegada à entrada da torre: do recuo do núcleo até a calçada
     });
     // rua interna, acesso e vagas (faixas amarelas)
+    BACK.links.forEach(function (l) { rect(SURF.asphalt, l[0], l[1], l[2], l[3]); });
     rect(SURF.asphalt, ROAD.x0, ROAD.z0, ROAD.x1, ROAD.z1);
     rect(SURF.asphalt, ACCESS.x0, ACCESS.z0, ACCESS.x1, ACCESS.z1);
     PARK.forEach(function (p) { rect(SURF.asphalt2, p[0], p[1], p[2], p[3]); });
@@ -362,17 +369,26 @@
     PARK.forEach(function (p, i) {
       for (let x = p[0]; x <= p[2] + 0.01; x += 2.5) {
         if (Math.abs(x - ACCESS.x0 - 3.5) < 4.5 && i === 1) continue;
-        if (TOWERS.some(function (t) { return Math.abs(x - t.x) < 3.4; }) && i === 0) continue;
+        if (CROSS.some(function (c) { return Math.abs(x - c) < 2.6; }) || nearLink(x, 0.3)) continue;
         g.beginPath(); g.moveTo(X(x), Z(i ? p[1] : p[1] + 0.6)); g.lineTo(X(x), Z(i ? p[3] - 0.6 : p[3])); g.stroke();
       }
     });
-    // faixas de pedestre em frente às entradas das torres e na pracinha
-    [TOWERS[0].x, TOWERS[1].x, -12, 36].forEach(function (x) {
-      for (let k = -2.4; k <= 2.4; k += 0.8) rect('rgba(245,245,240,.9)', x + k - 0.25, 15.6, x + k + 0.25, 32.4);
-    });
-    // rampas sem vaga na frente das entradas (calçada continua)
-    TOWERS.forEach(function (t) { rect(SURF.paving, t.x - 3.2, 15.5, t.x + 3.2, 21); });
     rect(SURF.asphalt, ACCESS.x0, 27, ACCESS.x1, 32.5);
+    // estacionamento dos fundos: corredor e duas fileiras de vagas (uma junto ao muro, outra atrás das torres)
+    rect(SURF.asphalt, BACK.aisle[0], BACK.aisle[1], BACK.aisle[2], BACK.aisle[3]);
+    BACK.rows.forEach(function (p) { rect(SURF.asphalt2, p[0], p[1], p[2], p[3]); });
+    speckle(BACK.rows[0][0], BACK.rows[0][1], BACK.rows[0][2], BACK.rows[1][3], 7000, 'rgba(0,0,0,.12)', 'rgba(255,255,255,.06)');
+    BACK.links.forEach(function (l) { speckle(l[0], l[1], l[2], l[3], 1200, 'rgba(0,0,0,.12)', 'rgba(255,255,255,.06)'); });
+    BACK.rows.forEach(function (p, i) {
+      for (let x = p[0] + (i ? 0 : 6.5); x <= p[2] - (i ? 0 : 6) + 0.01; x += 2.5) {
+        if (nearLink(x, 0.3)) continue;
+        g.beginPath(); g.moveTo(X(x), Z(i ? p[1] + 0.6 : p[1])); g.lineTo(X(x), Z(i ? p[3] : p[3] - 0.6)); g.stroke();
+      }
+    });
+    // faixas de pedestre de calçada a calçada: listras compridas no sentido da rua (dos carros), uma atrás da outra na travessia
+    CROSS.forEach(function (x) {
+      for (let z = 15.8; z < 32.3; z += 0.9) rect('rgba(246,246,242,.93)', x - 2.0, z, x + 2.0, z + 0.45);
+    });
     // passeio de tijolinho do lado sul do estacionamento e caminhos do lazer
     rect(SURF.brick, -80, 32.5, 61, 35);
     rect(SURF.walk, ACCESS.x1, 35, ACCESS.x1 + 1.6, 62);              // calçada do acesso, do portão para dentro
@@ -954,8 +970,8 @@
       };
       groundPlanes([POOLA.fence], deckTex, 0.006, [POOLA.adult, POOLA.kids].map(function (p) { return [p[0] - 0.02, p[1] - 0.02, p[2] + 0.02, p[3] + 0.02]; }));
       groundPlanes([KIOSK, [48.5, 35.5, 64, 52.5], [GUARD[0] - 1.5, GUARD[1] - 1.5, GUARD[2] + 1.5, LOT.z1], [TRASH[0] - 0.5, TRASH[1] - 0.5, TRASH[2] + 0.5, LOT.z1]]
-        .concat(TOWERS.map(function (t) { return [t.x - 3.2, t.z + ENTRY_Z, t.x + 3.2, 15.5]; })), paverTex, 0.01);
-      groundPlanes([[-80, 9.5, 61, 14.6], [-80, 32.5, 61, 35]], brickTex, 0.006);
+        .concat(TOWERS.map(function (t) { return [t.x - 3.2, t.z + ENTRY_Z, t.x + 3.2, 9.5]; })), paverTex, 0.01);
+      groundPlanes([[-80, 9.5, BACK.links[0][0], 14.6], [BACK.links[0][2], 9.5, BACK.links[1][0], 14.6], [-80, 32.5, 61, 35]], brickTex, 0.006);
       // gradil (grade de barras verticais) desenhado com transparência; UV em metros para todas as grades usarem o mesmo material
       // (alpha to coverage: as barras finas ficam lisas, sem serrilhado nem moiré)
       const gradilMat = (function () {
@@ -1003,7 +1019,7 @@
       rbox(M.glass, [GUARD[2] - 0.08, GUARD[1] + 0.25, GUARD[2], GUARD[3] - 0.08], 1.0, 2.6, false, false);
       rbox(S_.white, [GUARD[0], GUARD[3] - 0.08, GUARD[2], GUARD[3]], 2.6, 3.0, false);
       rbox(S_.white, [GUARD[2] - 0.08, GUARD[1], GUARD[2], GUARD[3]], 2.6, 3.0, false);
-      rbox(S_.dark, [-42, 53.5, -23.6, 63.6], 3.0, 3.35, false);                         // marquise
+      rbox(std({ color: 0x2C3037, roughness: 0.95, envMapIntensity: 0.4 }), [-42, 53.5, -23.6, 63.6], 3.0, 3.35, false);   // marquise
       [[-24.2, 54], [-24.2, 63.2]].forEach(function (p) { box(S_.dark, 0.3, 3.0, 0.3, p[0], 1.5, p[1], true); });
       rbox(S_.navy, [-42, 63.3, -23.6, 63.6], 2.55, 3.0, false);                         // testeira azul da marquise
       // portão de carros (gradil de correr) e portão de pedestres ao lado da guarita
@@ -1056,9 +1072,9 @@
         // letra gigante amarela sobre o canteiro, à esquerda de quem chega
         const lg = new THREE.ExtrudeGeometry(letterShape(T.id), { depth: 0.32, bevelEnabled: true, bevelThickness: 0.03, bevelSize: 0.03, bevelSegments: 1, curveSegments: 10 });
         const zl = T.z + HD;                                         // linha da fachada das alas
-        const letter = new THREE.Mesh(lg, S_.yellow); letter.scale.set(1.15, 1.15, 1); letter.position.set(T.x - 5.6, 0.55, zl + 1.5); letter.castShadow = true; siteG.add(letter);
-        rbox(S_.navy, [T.x - 7.2, zl + 1.2, T.x - 4.0, zl + 2.2], 0, 0.55, true);
-        for (let i = 0; i < 5; i++) bikes.push([T.x - 12 + i * 0.75, zl + 2.2]);
+        const letter = new THREE.Mesh(lg, S_.yellow); letter.scale.set(1.15, 1.15, 1); letter.position.set(T.x - 5.6, 0.55, zl + 0.45); letter.castShadow = true; siteG.add(letter);
+        rbox(S_.navy, [T.x - 7.2, zl + 0.2, T.x - 4.0, zl + 1.15], 0, 0.55, true);
+        for (let i = 0; i < 5; i++) bikes.push([T.x - 12 + i * 0.75, zl + 0.75]);
       });
       // bicicletários: arcos de inox
       inst(new THREE.TorusGeometry(0.42, 0.03, 6, 16, Math.PI), S_.steel, bikes, function (p) { dm.position.set(p[0], 0, p[1]); });
@@ -1230,12 +1246,14 @@
       // ---------- postes de luz (passeios e rua interna) ----------
       const posts = [];
       for (let x = -76; x <= 58; x += 12) {
-        if (!TOWERS.some(function (t) { return Math.abs(x - t.x) < 4; })) posts.push([x, 15.1]);
+        if (!TOWERS.some(function (t) { return Math.abs(x - t.x) < 4; }) && !nearLink(x, 0.8)) posts.push([x, 15.1]);
         if (Math.abs(x + 6 - (ACCESS.x0 + ACCESS.x1) / 2) > 5) posts.push([x + 6, 33.0]);
       }
+      for (let x = -54; x <= 54; x += 12) if (Math.abs(x) > 3.5) posts.push([x, -9.65, 1]);      // fundos, entre a torre e as vagas
+      [[-67, -18], [66.5, -10], [-67, 10], [66.5, 10]].forEach(function (p) { posts.push([p[0], p[1], 2]); });
       [[-24.6, 40], [-24.6, 50], [-34.4, 45], [-2.5, 44], [22, 44], [-56, 41]].forEach(function (p) { posts.push(p); });
       // poste: coluna cônica, braço e luminária de LED achatada, virada para a rua (ou para o caminho)
-      const postYaw = function (p) { return p[1] < 20 ? 0 : p[1] > 30 && p[1] < 34 ? Math.PI : Math.PI / 2; };
+      const postYaw = function (p) { return p[2] === 1 ? Math.PI : p[2] === 2 ? (p[0] < 0 ? Math.PI / 2 : -Math.PI / 2) : p[1] < 20 ? 0 : p[1] > 30 && p[1] < 34 ? Math.PI : Math.PI / 2; };
       inst(mergeGeos([[new THREE.CylinderGeometry(0.045, 0.075, 4.3, 10), mat4(0, 2.15, 0)], [new THREE.BoxGeometry(0.05, 0.05, 0.62), mat4(0, 4.22, 0.28)], [new THREE.CylinderGeometry(0.1, 0.12, 0.25, 10), mat4(0, 0.12, 0)]]),
         S_.dark, posts, function (p) { dm.position.set(p[0], 0, p[1]); dm.rotation.y = postYaw(p); });
       inst(mergeGeos([[new THREE.BoxGeometry(0.24, 0.07, 0.5), mat4(0, 4.17, 0.62)]]), lampHeads, posts, function (p) { dm.position.set(p[0], 0, p[1]); dm.rotation.y = postYaw(p); }, false);
@@ -1245,10 +1263,16 @@
       const cars = [], CR = rng(31), carCols = ['#E9EAEC', '#1F2328', '#8D939B', '#B9BEC4', '#6B1F24', '#2B3E66', '#D7D2C6', '#3C4A3A'];
       PARK.forEach(function (p, i) {
         for (let x = p[0] + 1.25; x < p[2]; x += 2.5) {
-          if (i === 0 && TOWERS.some(function (t) { return Math.abs(x - t.x) < 3.4; })) continue;
           if (i === 1 && Math.abs(x - (ACCESS.x0 + ACCESS.x1) / 2) < 4.5) continue;
-          if ([-12, 36].some(function (c) { return Math.abs(x - c) < 3; })) continue;
+          if (CROSS.some(function (c) { return Math.abs(x - c) < 3.2; }) || nearLink(x, 1.3)) continue;
           if (CR() < 0.48) cars.push([x, i ? p[1] + 2.6 : p[3] - 2.6, i ? 0 : Math.PI, carCols[Math.floor(CR() * carCols.length)]]);
+        }
+      });
+      // fundos: vagas junto ao muro (carro de frente para o corredor) e atrás das torres
+      BACK.rows.forEach(function (p, i) {
+        for (let x = p[0] + (i ? 1.25 : 7.75); x < p[2] - (i ? 0 : 6); x += 2.5) {
+          if (nearLink(x, 1.3)) continue;
+          if (CR() < 0.42) cars.push([x, i ? p[1] + 2.5 : p[3] - 2.5, i ? 0 : Math.PI, carCols[Math.floor(CR() * carCols.length)]]);
         }
       });
       // carro: carroceria com capô, porta-malas e teto (perfil extrudado, cantos arredondados), vidros escuros com reflexo e rodas
@@ -1284,13 +1308,13 @@
       const row = function (x0, x1, z, depth, face) {
         for (let x = x0; x < x1; x += 11 + R() * 4) houses.push([x + R() * 2, z + (R() - 0.5) * 2, 7 + R() * 4, depth * (0.8 + R() * 0.3), 3 + R() * 3.2, face + (R() - 0.5) * 0.08]);
       };
-      row(-108, 92, -27, 9, 0); row(-108, 92, -55, 9, 0); row(-108, 92, -68, 9, 0);
-      for (let z = -30; z < 76; z += 12 + R() * 3) { houses.push([-110 + R() * 2, z, 9 + R() * 3, 8 + R() * 4, 3 + R() * 3, Math.PI / 2]); }
-      for (let z = -30; z < 76; z += 13 + R() * 3) { houses.push([-124 + R() * 2, z, 9 + R() * 3, 8 + R() * 4, 3 + R() * 3, Math.PI / 2]); }
+      row(-108, 92, -41, 9, 0); row(-108, 92, -69, 9, 0); row(-108, 92, -82, 9, 0);
+      for (let z = -44; z < 76; z += 12 + R() * 3) { houses.push([-110 + R() * 2, z, 9 + R() * 3, 8 + R() * 4, 3 + R() * 3, Math.PI / 2]); }
+      for (let z = -44; z < 76; z += 13 + R() * 3) { houses.push([-124 + R() * 2, z, 9 + R() * 3, 8 + R() * 4, 3 + R() * 3, Math.PI / 2]); }
       row(-90, -38, 70.5, 8, Math.PI); row(-200, -26, 91, 8, Math.PI);
       for (let i = 0; i < 420 && houses.length < 190; i++) {
         const x = (R() - 0.5) * 600, z = (R() - 0.5) * 520 - 20;
-        if (x > -132 && x < 160 && z > -80 && z < 165) continue;
+        if (x > -132 && x < 160 && z > -94 && z < 165) continue;
         if (houses.some(function (h) { return Math.abs(h[0] - x) < 13 && Math.abs(h[1] - z) < 13; })) continue;
         houses.push([x, z, 7 + R() * 6, 8 + R() * 6, 3 + R() * 3.2, R() * 0.4 - 0.2]);
       }
@@ -1315,7 +1339,8 @@
       TOWERS.forEach(function (t) { roofs_.push([t.x - HL - 1, t.z - HD - 1, t.x + HL + 1, t.z + HD + WING_DZ + 3.5]); });
       const paved = [POOLA.fence, PLAY, PET, KIOSK, [ROAD.x0, 9.5, ROAD.x1, 35], [ACCESS.x0 - 1.8, ACCESS.z0, ACCESS.x1 + 1.8, 90], [-5, 35, 0, 52], [20, 35, 24, 54], [-58, 35, -54, 46],
         [48.5, 35.5, 64, 52.5], [GUARD[0] - 1.5, GUARD[1] - 1.5, GUARD[2] + 1.5, LOT.z1], [TRASH[0] - 0.5, TRASH[1] - 0.5, TRASH[2] + 0.5, LOT.z1],
-        [SITE.x0 - 100, -45.5, SITE.x1 + 100, -36], [-101.5, SITE.z0 - 100, -92, SITE.z1 + 100], [SITE.x0 - 100, 76, -23.5, 85.5]];
+        [SITE.x0 - 100, -59.5, SITE.x1 + 100, -50], [-101.5, SITE.z0 - 100, -92, SITE.z1 + 100], [SITE.x0 - 100, 76, -23.5, 85.5],
+        [BACK.rows[0][0] - 0.5, BACK.rows[0][1] - 0.2, BACK.rows[0][2] + 0.5, BACK.rows[1][3] + 0.3]].concat(BACK.links);
       houses.forEach(function (h) { const r = Math.max(h[2], h[3]) * 0.62; roofs_.push([h[0] - r, h[1] - r, h[0] + r, h[1] + r]); });
       const distRect = function (x, z, r) { const dx = Math.max(r[0] - x, 0, x - r[2]), dz = Math.max(r[1] - z, 0, z - r[3]); return Math.hypot(dx, dz); };
       const fit = function (x, z, s) {          // devolve a copa que cabe (0 = não cabe árvore ali)
@@ -1328,7 +1353,7 @@
       const trees = [];
       const add = function (x, z, s, solid) { s = fit(x, z, s); if (!s) return; trees.push([x, z, s]); if (solid) GROUND_SOLIDS.push([x - 0.3, z - 0.3, x + 0.3, z + 0.3]); };
       // no lote: fileira junto ao muro do fundo, nas laterais, entre as áreas de lazer e na frente
-      for (let x = -82; x <= 63; x += 6.5) add(x + R(), -11.5 + R(), 1.5 + R() * 1.6, true);
+      for (let x = -82; x <= 63; x += 6.5) add(x + R(), LOT.z0 + 1.05 + R() * 0.25, 1.5 + R() * 1.6, true);   // fileira junto ao muro do fundo
       for (let z = 10; z <= 58; z += 7) { add(-83 + R() * 0.6, z + R(), 1.5 + R() * 1.6, true); add(64.2 + R() * 0.6, z + R(), 1.4 + R() * 1.2, true); }
       [[-55.5, 39], [-56, 50], [-45, 42], [-45, 49.5], [-22.5, 56], [-14, 56.5], [-5, 57], [4, 56.5], [13, 56.5], [21.5, 58.5], [52, 56.5], [58, 56], [-61, 10], [-63, 1], [61, 4], [61, -6], [-1, -10], [1.5, 3]].forEach(function (p) { add(p[0], p[1], 1.6 + R() * 1.4, true); });
       // mata nativa: ao sul do lote (a leste da rua de acesso) e a leste; árvores esparsas nos quintais e nas calçadas
@@ -1341,7 +1366,7 @@
       forest(-90, 64, -36, 74.5, 6);
       for (let i = 0; i < 160; i++) {
         const x = (R() - 0.5) * 520, z = (R() - 0.5) * 440 - 30;
-        if (x > -92 && x < 70 && z > -36 && z < 100) continue;
+        if (x > -92 && x < 70 && z > -50 && z < 100) continue;
         if (x > 66) continue;
         add(x, z, 1.5 + R() * 1.7);
       }
@@ -1422,7 +1447,7 @@
 
       /* arbustos e canteiros: cerca viva junto ao muro do fundo e à grade da frente, entre as torres, na portaria e no espaço pet */
       const bushes = [];
-      const bush = function (x, z, r, c) { if (!fit(x, z, 1.2)) return; bushes.push([x, z, r, c]); GROUND_SOLIDS.push([x - r * 0.7, z - r * 0.7, x + r * 0.7, z + r * 0.7]); };
+      const bush = function (x, z, r, c) { if (!fit(x, z, 1.2) || trees.some(function (t) { return Math.hypot(t[0] - x, t[1] - z) < 0.9; })) return; bushes.push([x, z, r, c]); GROUND_SOLIDS.push([x - r * 0.7, z - r * 0.7, x + r * 0.7, z + r * 0.7]); };
       for (let x = LOT.x0 + 1.5; x < LOT.x1 - 1; x += 1.25) bush(x + R() * 0.3, LOT.z0 + 0.9, 0.6 + R() * 0.25, 0);
       for (let x = LOT.x0 + 2; x < LOT.x1 - 1; x += 1.4) if (x < -48 || x > -23) bush(x + R() * 0.3, LOT.z1 - 1.0, 0.55 + R() * 0.2, R() < 0.25 ? 1 : 0);
       for (let z = -4; z <= 8; z += 1.5) { bush(-0.6 + R() * 0.3, z, 0.5 + R() * 0.2, 0); }

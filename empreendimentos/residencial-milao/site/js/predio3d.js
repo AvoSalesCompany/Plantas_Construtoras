@@ -296,14 +296,14 @@
   const ACCESS = { x0: -33, x1: -26, z0: 27, z1: 62 };           // acesso de carros: do portão (de frente para a Torre A) até a rua interna
   const GATE = { x0: -33, x1: -26, z: 62 };
   // lazer (imagens da Baliza): na frente da Torre B, onde o estacionamento acaba, o salão de festas (porta de vidro para o
-  // estacionamento) e a piscina, com os quiosques logo ao sul, junto às vagas; na lateral da Torre B, numa faixa estreita,
-  // o espaço pet e, atrás dele (para o fundo do lote), a pracinha
+  // estacionamento) com os quiosques ao lado e, mais para a frente (para o lado da rua), a piscina; na lateral da Torre B,
+  // numa faixa estreita, o espaço pet e, atrás dele (para o fundo do lote), a pracinha
   const HALL = [44, 16.5, 58, 30.5];                               // salão de festas (por dentro)
   const TERR = [58, 16.5, 62, 30.5];                               // varanda coberta do salão, guarda-corpo branco, de frente para a piscina
-  const POOLA = { fence: [62, 15.8, 79.6, 36], adult: [65, 18.5, 77.5, 24.5], kids: [65, 30.6, 68.8, 34.0] };
+  const POOLA = { fence: [48, 38.5, 79.6, 58.5], adult: [53, 42, 66, 48.5], kids: [70, 42.5, 74, 46.1] };
   const PET = [61, -6, 76, 8], PLAY = [60, -26, 78, -10], RES = [-81, -9, -66, 7];
-  const KZ0 = 38.0, KIOSKS = [50.5, 63.5];                         // quiosques: começo da pérgola (z) e centro (x) de cada um
-  const KIOSK = [44, KZ0 - 0.8, 70, KZ0 + 15];
+  const KZ0 = 18.0, KIOSKS = [66.2, 75.4];                         // quiosques: começo da pérgola (z) e centro (x) de cada um
+  const KIOSK = [62, KZ0 - 0.8, LOT.x1 - 0.4, KZ0 + 15];
   const PLAZA = [57, 8.6, LOT.x1 - 0.4, 15.6];                     // passeio do lazer: entre o pet, a piscina e a frente da Torre B
   const GUARD = [-25.6, 56, -19.6, 62];                            // guarita (a frente é o alinhamento do muro), à direita de quem chega
   const PILLAR = [-40.2, 62, -37.6, 63.3];                         // pilar de concreto com MILÃO, à esquerda de quem chega
@@ -410,7 +410,8 @@
     [-62, -10, 14].forEach(function (x) { rect(SURF.walk, x, 35, x + 1.6, 46); });
     // lazer: calçada da frente do salão e da piscina até o passeio do lazer, caminho da lateral da torre até a pracinha,
     // calçada da entrada do salão (de frente para o fim do estacionamento) e o caminho que desce para os quiosques
-    rect(SURF.walk, 57, PLAZA[1], LOT.x1, 15.75); rect(SURF.walk, ROAD.x1, 15.5, POOLA.fence[0], HALL[1]);
+    rect(SURF.walk, 57, PLAZA[1], LOT.x1, 15.75); rect(SURF.walk, ROAD.x1, 15.5, TERR[2], HALL[1]);
+    rect(SURF.paving, HALL[0], 35, TERR[2], 37); rect(SURF.paving, 48.4, 37, 51.2, POOLA.fence[1]);
     rect(SURF.walk, 57.3, BACK.aisle[1], PET[0] - 0.4, PLAZA[1]);
     rect(SURF.walk, PLAY[0], PLAY[3], PLAY[2], PET[1] - 2.3);
     rect(SURF.paving, ROAD.x1, HALL[1], HALL[0], 35);
@@ -611,7 +612,7 @@
     scene.add(sun); scene.add(sun.target);
     const amb = new THREE.AmbientLight(0x8090C0, 0); scene.add(amb);
     const lamps = [];
-    [[TOWERS[0].x, 14], [TOWERS[1].x, 15], [-29.5, 57], [71, 27], [51, 23.5], [69, -17], [57, 45], [-10, 46]].forEach(function (p) {
+    [[TOWERS[0].x, 14], [TOWERS[1].x, 15], [-29.5, 57], [60, 48], [51, 23.5], [69, -17], [71, 25], [-10, 46]].forEach(function (p) {
       const l = new THREE.PointLight(0xFFC98A, 0, 24, 2); l.position.set(p[0], 4.2, p[1]); scene.add(l); lamps.push(l);
     });
 
@@ -1088,7 +1089,7 @@
         }
       }, 1 / 2.4, 1 / 2.4);
       groundPlanes([POOLA.fence, [TERR[0], TERR[1], TERR[2] + 0.2, TERR[3]]], porcTex, 0.006, [POOLA.adult, POOLA.kids].map(function (p) { return [p[0] - 0.02, p[1] - 0.02, p[2] + 0.02, p[3] + 0.02]; }));
-      groundPlanes(KIOSKS.map(function (cx) { return [cx - 4.2, KZ0 - 0.6, cx + 4.2, KZ0 + 14.6]; }).concat([[ROAD.x1, HALL[1], HALL[0], 35], [PET[2] - 5, PET[1] + 0.2, PET[2] - 0.2, PET[1] + 3.6],
+      groundPlanes(KIOSKS.map(function (cx) { return [cx - 4.2, KZ0 - 0.6, cx + 4.2, KZ0 + 14.6]; }).concat([[ROAD.x1, HALL[1], HALL[0], 35], [HALL[0], 35, TERR[2], 37], [48.4, 37, 51.2, POOLA.fence[1]], [PET[2] - 5, PET[1] + 0.2, PET[2] - 0.2, PET[1] + 3.6],
         [-41, 52, -16, LOT.z1], [-36.4, LOT.z1, -14, 66], [TRASH[0] - 0.5, TRASH[1] - 0.5, TRASH[2] + 0.5, LOT.z1]])
         .concat(TOWERS.map(function (t) { return [t.x - 3.2, t.z + ENTRY_Z, t.x + 3.2, 9.5]; })), paverTex, 0.01);
       groundPlanes([[-80, 9.5, BACK.links[0][0], 14.6], [BACK.links[0][2], 9.5, 57, 14.6], [-80, 32.5, ROAD.x1, 35]], brickTex, 0.006);
@@ -1621,8 +1622,8 @@
       });
       // espreguiçadeiras: estrutura branca com encosto inclinado e almofadas, viradas para a piscina (e para o sol, ao norte)
       const loungers = [];
-      for (let x = 69.8; x <= 77.9; x += 1.6) loungers.push([x, 27.3, Math.PI]);
-      loungers.push([71.2, 33.4, Math.PI], [73.0, 33.4, Math.PI]);
+      for (let x = 54.0; x <= 65.3; x += 1.6) loungers.push([x, 51.2, Math.PI]);
+      loungers.push([71.2, 49.6, Math.PI], [73.0, 49.6, Math.PI]);
       const lFrame = mergeGeos([[new THREE.BoxGeometry(0.64, 0.05, 1.95), mat4(0, 0.3, 0.05)],
         [new THREE.BoxGeometry(0.04, 0.3, 0.04), mat4(-0.29, 0.15, 0.9)], [new THREE.BoxGeometry(0.04, 0.3, 0.04), mat4(0.29, 0.15, 0.9)],
         [new THREE.BoxGeometry(0.04, 0.3, 0.04), mat4(-0.29, 0.15, -0.8)], [new THREE.BoxGeometry(0.04, 0.3, 0.04), mat4(0.29, 0.15, -0.8)],
@@ -1637,7 +1638,7 @@
       // guarda-sóis: abrem e fecham (a lona desce e fecha em volta do mastro)
       const canopyMat = std({ color: 0xF1EBDD, roughness: 0.85, side: THREE.DoubleSide });
       const canopyGeo = new THREE.ConeGeometry(1.5, 0.5, 12, 1, true);
-      [[70.6, 29.2], [73.8, 29.2], [77.0, 29.2], [72.1, 35.0]].forEach(function (p) {
+      [[54.8, 53.1], [58.0, 53.1], [61.2, 53.1], [64.4, 53.1], [72.1, 51.5]].forEach(function (p) {
         box(S_.white, 0.05, 2.55, 0.05, p[0], 1.27, p[1], true);
         const base = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.27, 0.07, 18), S_.dark); base.position.set(p[0], 0.035, p[1]); siteG.add(base);
         const u = new THREE.Mesh(canopyGeo, canopyMat); u.position.set(p[0], 2.42, p[1]); u.castShadow = true; scene.add(u);
@@ -1653,7 +1654,7 @@
       });
       // cerca de vidro com corrimão de inox; a entrada fica do lado da praça
       const pf = POOLA.fence;
-      [[pf[0], pf[1], 63.2, pf[1]], [64.8, pf[1], pf[2], pf[1]], [pf[0], pf[3], pf[2], pf[3]], [pf[0], pf[1], pf[0], HALL[1]], [pf[0], HALL[3], pf[0], pf[3]]].forEach(function (s) {
+      [[pf[0], pf[1], 49.0, pf[1]], [50.6, pf[1], pf[2], pf[1]], [pf[0], pf[3], pf[2], pf[3]], [pf[0], pf[1], pf[0], pf[3]]].forEach(function (s) {
         const horiz = Math.abs(s[3] - s[1]) < 0.01;
         rbox(M.glass, horiz ? [s[0], s[1] - 0.02, s[2], s[1] + 0.02] : [s[0] - 0.02, s[1], s[0] + 0.02, s[3]], 0, 1.2, true, false);
         rbox(S_.steel, horiz ? [s[0], s[1] - 0.03, s[2], s[1] + 0.03] : [s[0] - 0.03, s[1], s[0] + 0.03, s[3]], 1.2, 1.25, false);
@@ -1661,7 +1662,7 @@
         for (let k = 0; k <= n; k++) { const a = (horiz ? s[0] : s[1]) + len * k / n; box(S_.steel, 0.05, 1.22, 0.05, horiz ? a : s[0], 0.61, horiz ? s[1] : a, false, false); }
       });
       // ducha de inox junto à entrada: liga e desliga
-      const DX = 78.3, DZ = 16.5;
+      const DX = 51.6, DZ = 39.3;
       box(S_.steel, 0.08, 2.3, 0.08, DX, 1.15, DZ, true);
       box(S_.steel, 0.5, 0.05, 0.06, DX + 0.22, 2.3, DZ, false, false);
       const sh = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.07, 0.06, 18), S_.steel); sh.position.set(DX + 0.44, 2.25, DZ); siteG.add(sh);
@@ -1990,7 +1991,7 @@
       inst(mergeGeos([[new THREE.BoxGeometry(0.24, 0.07, 0.5), mat4(0, 4.17, 0.62)]]), lampHeads, posts, function (p) { dm.position.set(p[0], 0, p[1]); dm.rotation.y = postYaw(p); }, false);
       posts.forEach(function (p) { solid(p[0] - 0.12, p[1] - 0.12, p[0] + 0.12, p[1] + 0.12); });
       // LED duplo (como na foto da piscina): mastro alto com duas luminárias, uma para cada lado
-      const post2 = [[62.5, 35.4, 0], [62.7, 24.0, 0], [79.2, 31.0, 0], [57.2, KZ0 + 6.4, Math.PI / 2], [69.4, KZ0 + 6.4, Math.PI / 2], [57.6, 12.0, 0], [79.2, 9.2, 0], [58.9, -18.0, Math.PI / 2], [43.6, 30.0, Math.PI / 2]];
+      const post2 = [[48.6, 57.9, 0], [79.2, 39.4, 0], [66.8, 57.9, 0], [70.8, KZ0 + 6.4, Math.PI / 2], [79.3, KZ0 + 14.2, Math.PI / 2], [57.6, 12.0, 0], [79.2, 9.2, 0], [58.9, -18.0, Math.PI / 2], [43.6, 30.0, Math.PI / 2]];
       inst(mergeGeos([[new THREE.CylinderGeometry(0.05, 0.08, 4.6, 10), mat4(0, 2.3, 0)], [new THREE.BoxGeometry(1.0, 0.05, 0.05), mat4(0, 4.55, 0)], [new THREE.CylinderGeometry(0.11, 0.13, 0.25, 10), mat4(0, 0.12, 0)]]),
         S_.dark, post2, function (p) { dm.position.set(p[0], 0, p[1]); dm.rotation.y = p[2]; });
       inst(mergeGeos([[new THREE.BoxGeometry(0.42, 0.07, 0.2), mat4(-0.62, 4.52, 0)], [new THREE.BoxGeometry(0.42, 0.07, 0.2), mat4(0.62, 4.52, 0)]]), lampHeads, post2, function (p) { dm.position.set(p[0], 0, p[1]); dm.rotation.y = p[2]; }, false);
@@ -2078,7 +2079,7 @@
         .concat(KIOSKS.map(function (cx) { return [cx - 4.0, KZ0 - 0.4, cx + 4.0, KZ0 + 14.8]; }));
       TOWERS.forEach(function (t) { roofs_.push([t.x - HL - 1, t.z - HD - 1, t.x + HL + 1, t.z + HD + WING_DZ + 3.5]); });
       const paved = [POOLA.fence, PLAY, PET, PLAZA, [HALL[0], HALL[1], TERR[2] + 0.4, HALL[3]], [ROAD.x1, 9.5, 57, 15.75], [57.3, BACK.aisle[1], PET[0] - 0.4, PLAZA[1]],
-        [PLAY[0], PLAY[3], PLAY[2], PET[1] - 2.3], [ROAD.x1, HALL[1], HALL[0], 35], [ROAD.x1, 35, ROAD.x1 + 1.6, 47.6],
+        [PLAY[0], PLAY[3], PLAY[2], PET[1] - 2.3], [ROAD.x1, HALL[1], HALL[0], 35], [ROAD.x1, 35, ROAD.x1 + 1.6, 47.6], [HALL[0], 35, TERR[2], 37],
         [ROAD.x0, 9.5, ROAD.x1, 35], [ACCESS.x0 - 1.8, ACCESS.z0, ACCESS.x1 + 1.8, 90], [-46, 52, -12, 67],
         [-80, 46, ACCESS.x0 - 1.6, 47.6], [ACCESS.x1 + 1.6, 46, ROAD.x1 + 1.6, 47.6], [TRASH[0] - 0.5, TRASH[1] - 0.5, TRASH[2] + 0.5, LOT.z1],
         [SITE.x0 - 100, -59.5, SITE.x1 + 100, -50], [-101.5, SITE.z0 - 100, -92, SITE.z1 + 100], [SITE.x0 - 100, 76, -23.5, 85.5],
@@ -2102,7 +2103,7 @@
       for (let z = 10; z <= 58; z += 7) add(-83 + R() * 0.6, z + R(), 1.5 + R() * 1.6, true);
       for (let z = 16; z <= 58; z += 7) add(LOT.x1 - 1.7 - R() * 0.5, z + R(), 1.4 + R() * 1.2, true, z % 3 ? 0 : 2);
       [39.5, 55].forEach(function (z, j) { for (let x = -80, k = 0; x <= 100; x += 8.5, k++) add(x + (R() - 0.5) * 2.5, z + (R() - 0.5) * 2.5, 1.6 + R() * 1.5, true, (k + j) % 4 === 1 ? 1 : (k + j) % 7 === 3 ? 3 : 0); });
-      [[-61, 10], [-63, 1], [-1, -10], [1.5, 3], [57.0, KZ0 + 2.5, 1], [57.0, KZ0 + 11, 3], [70.4, KZ0 + 1.5, 2], [75.5, KZ0 + 7, 1], [77.5, KZ0 + 14, 3], [40.5, KZ0 + 1.2, 1], [78.4, -8.0, 1], [78.6, -1.0, 3]].forEach(function (p) { add(p[0], p[1], 1.7 + R() * 1.3, true, p[2] || 0); });
+      [[-61, 10], [-63, 1], [-1, -10], [1.5, 3], [45.5, 33.8, 1], [70.5, 35.6, 2], [77.6, 35.6, 3], [45.0, 51.0, 1], [45.0, 58.0, 3], [40.5, 39.2, 1], [78.4, -8.0, 1], [78.6, -1.0, 3]].forEach(function (p) { add(p[0], p[1], 1.7 + R() * 1.3, true, p[2] || 0); });
       // mata nativa: ao sul do lote (a leste da rua de acesso) e a leste; árvores esparsas nos quintais e nas calçadas
       const forest = function (x0, z0, x1, z1, step) {
         for (let x = x0; x < x1; x += step) for (let z = z0; z < z1; z += step) add(x + (R() - 0.5) * step * 0.9, z + (R() - 0.5) * step * 0.9, 2 + R() * 2.4);
@@ -2169,7 +2170,7 @@
       dm.scale.set(1, 1, 1); dm.rotation.set(0, 0, 0);
 
       /* palmeiras em volta da piscina, do salão e da portaria: tronco fino e alto, folhas em arco com folíolos (alpha to coverage) */
-      const palms = [[79.0, 35.3, 7.0], [79.1, 22.0, 6.4], [62.6, 16.5, 6.0], [-42.8, 60.0, 6.8], [-16.8, 59.6, 7.0]].filter(function (p) {
+      const palms = [[79.0, 57.9, 7.0], [78.8, 44.2, 6.4], [48.6, 39.2, 6.0], [-42.8, 60.0, 6.8], [-16.8, 59.6, 7.0]].filter(function (p) {
         return !trees.some(function (t) { return Math.hypot(t[0] - p[0], t[1] - p[1]) < t[2] + 1.5; });
       });
       if (palms.length) {
@@ -2208,8 +2209,8 @@
       // cerca viva florida roxa entre o espaço pet e a piscina e do lado de fora do pet (foto), flores junto aos quiosques e ao salão
       for (let x = PET[0] + 0.5; x < PET[2] - 0.3; x += 0.95) bush(x + R() * 0.2, PET[1] - 1.45 + R() * 0.15, 0.5 + R() * 0.12, R() < 0.8 ? 3 : 0, true);
       for (let z = PET[1] + 0.6; z < PET[3] - 0.5; z += 0.95) bush(PET[2] + 0.75 + R() * 0.15, z + R() * 0.2, 0.48 + R() * 0.12, R() < 0.8 ? 3 : 0, true);
-      for (let z = KZ0; z < KZ0 + 14.3; z += 1.15) bush(KIOSKS[0] - 4.1 + R() * 0.15, z + R() * 0.2, 0.42 + R() * 0.1, R() < 0.5 ? 1 : 2, true);
-      [[43.1, 16.9], [58.6, 31.6], [61.2, 31.6], [58.6, 34.6], [61.2, 34.6]].forEach(function (p) { bush(p[0], p[1], 0.5, R() < 0.6 ? 3 : 1, true); });
+      for (let x = KIOSKS[0] - 3.4; x < KIOSKS[1] + 3.5; x += 1.15) bush(x + R() * 0.2, KZ0 + 14.95 + R() * 0.15, 0.42 + R() * 0.1, R() < 0.5 ? 1 : 2, true);
+      [[43.1, 16.9], [58.6, 31.8], [61.2, 31.8], [45.0, 33.6], [56.8, 33.6]].forEach(function (p) { bush(p[0], p[1], 0.5, R() < 0.6 ? 3 : 1, true); });
       const bushCols = [['#3F6E34', '#4F7F3C', '#5B8A43'], ['#C8466A', '#E07A3A', '#D9B13A'], ['#6E5AA8', '#C8466A', '#F2F0EA'], ['#7B4FA8', '#8E5DB8', '#6A4596', '#A06CC8', '#5E8A43']];
       const bm = new THREE.InstancedMesh(blobGeo([[0, 0, 0, 1], [0.5, -0.2, 0.1, 0.6], [-0.45, -0.2, -0.1, 0.6]], 1, 9), crownMat, bushes.length);
       bushes.forEach(function (b, i) {
@@ -2721,7 +2722,7 @@
           const e = L.k * L.k * (3 - 2 * L.k); L.slide[0].position.x = -0.8 * e; L.slide[1].position.x = 0.8 * e; busy = true;
         }
         // ondinhas da piscina quando ela está por perto
-        if (Math.hypot(cam.position.x - 71, cam.position.z - 26) < 45) { S_.water.normalMap.offset.set(now * 0.000011, now * 0.000007); busy = true; }
+        if (Math.hypot(cam.position.x - 60, cam.position.z - 46) < 45) { S_.water.normalMap.offset.set(now * 0.000011, now * 0.000007); busy = true; }
         // salão, churrasqueiras, brinquedos, guarda-sóis, portões, água das torneiras: o que estiver se mexendo
         glCam.copy(cam.position);
         if (stepProps(dt, now, cam)) busy = true;
@@ -3316,10 +3317,10 @@
           // atalhos para as áreas de lazer (lista do painel) e o que se usa nelas
           spots: [
             { id: 'salao', name: 'Salão de festas', at: [42.8, 1.6, 22.5], to: [50, 1.4, 22.5] },
-            { id: 'piscina', name: 'Piscina', at: [64.0, 1.6, 14.2], to: [71, 1.0, 22] },
+            { id: 'piscina', name: 'Piscina', at: [49.8, 1.6, 36.4], to: [60, 1.0, 46] },
             { id: 'pracinha', name: 'Pracinha', at: [58.9, 1.6, -9.0], to: [68, 1.2, -18] },
             { id: 'pet', name: 'Espaço pet', at: [67.8, 1.6, 10.8], to: [68, 1.0, 1] },
-            { id: 'quiosques', name: 'Quiosques', at: [42.9, 1.6, KZ0 + 6], to: [51, 1.3, KZ0 + 6] },
+            { id: 'quiosques', name: 'Quiosques', at: [70.8, 1.6, 14.6], to: [70.8, 1.3, KZ0 + 9] },
             { id: 'portaria', name: 'Portaria', at: [-29.5, 1.6, 52.0], to: [-29.5, 1.5, 62] }
           ],
           props: propApi

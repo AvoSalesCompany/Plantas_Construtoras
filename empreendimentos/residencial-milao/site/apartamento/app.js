@@ -2456,7 +2456,9 @@
         walk: (G.walk || []).map(rectL),
         zones: (G.zones || []).map(function (z) { return { id: z.id, name: z.name, area: '', dims: '', q: rectL(z.r) }; }),
         yard: { id: 'terreo', name: G.name || 'Térreo do condomínio', area: '', dims: '' },
-        spawn: { at: vL(G.spawn.at), to: vL(G.spawn.to) }
+        spawn: { at: vL(G.spawn.at), to: vL(G.spawn.to) },
+        spots: (G.spots || []).map(function (s) { return { id: s.id, name: s.name, at: vL(s.at), to: vL(s.to) }; }),
+        props: G.props || null
       };
     })() : null;
     // elevador: cabine, paredes, portas (a da frente abre nos andares, a de trás no térreo), halls onde se chama, corredor dos outros andares
@@ -2829,7 +2831,7 @@
       if (lift) lift.rider = false;
       setLevel('apt');
       ceilGroup.visible = false; keys.clear(); upHeld = 0; downHeld = 0; joy.x = 0; joy.y = 0; joy.id = null;
-      player.pose = null; player.target = null; ptween = null; currentRoom = null; hideTip();
+      endPose(player.pose); player.pose = null; player.target = null; ptween = null; currentRoom = null; hideTip();
       overlay.visible = state.overlay;
       if (prevWallsLow && !state.wallsLow) setWallsLow(true);
     }
@@ -2865,7 +2867,7 @@
       if (!immersive()) prevWallsLow = state.wallsLow;
       if (state.wallsLow) setWallsLow(false);
       setRotate(false); controls.enabled = false;
-      player.pose = null; player.target = null; player.vel.set(0, 0, 0); ptween = null;
+      endPose(player.pose); player.pose = null; player.target = null; player.vel.set(0, 0, 0); ptween = null;
       overlay.visible = false; hideTip();
     }
     function enterWalk(id) {
@@ -2934,19 +2936,23 @@
       return inQ(ELV.hall, x, z) ? 'hall' : null;
     }
     // atalhos da lista: 'terreo' (sai na frente da torre, no térreo) e 'hall' (hall dos elevadores do andar do apto, de frente para as portas)
+    // atalhos: 'terreo' (na frente da torre), 'terreo:<área>' (salão, piscina, pracinha, pet, quiosques, portaria) e 'hall'
     function teleport(dest) {
-      if (dest === 'terreo' ? !GROUND : !ELV) return;
+      const spot = GROUND && typeof dest === 'string' && dest.indexOf('terreo:') === 0 ? GROUND.spots.find(function (s) { return 'terreo:' + s.id === dest; }) : null;
+      const toGround = dest === 'terreo' || !!spot;
+      if (toGround ? !GROUND : !ELV) return;
       if (!immersive()) beginImmersive();
+      endPose(player.pose);
       tween = null; ptween = null; player.target = null; player.pose = null; player.vel.set(0, 0, 0);
       if (lift) lift.rider = false;
-      setLevel(dest === 'terreo' ? 'ground' : 'apt');
+      setLevel(toGround ? 'ground' : 'apt');
       view = 'walk'; camera.near = 0.04; camera.fov = 70; camera.updateProjectionMatrix();
-      const at = dest === 'terreo' ? GROUND.spawn.at.clone() : ELV.hallSpot.at.clone(), to = dest === 'terreo' ? GROUND.spawn.to.clone() : ELV.hallSpot.to.clone();
+      const from = spot || (toGround ? GROUND.spawn : ELV.hallSpot), at = from.at.clone(), to = from.to.clone();
       at.y = baseY() + EYE; to.y = baseY() + EYE - 0.25;
       const dir = to.sub(at).normalize();
       player.yaw = Math.atan2(dir.x, dir.z); player.pitch = Math.asin(clamp(dir.y, -1, 1));
       player.pos.copy(at);
-      ceilGroup.visible = dest !== 'terreo';
+      ceilGroup.visible = !toGround;
       currentRoom = roomAt(at.x, at.z);
       camera.position.copy(player.pos); camera.lookAt(tmpV.copy(player.pos).add(lookDir()));
       syncUI(); focusCanvas(); markDirty();
@@ -3075,6 +3081,18 @@
       return { label: function () { return w.id === 'floor' ? (w.n ? 'Ir para o ' + w.n + 'º andar' : 'Ir para o térreo') : LIFT_LABEL[w.id]; },
         act: function () { if (w.id === 'floor') liftCmd(w.n); else if (w.id !== 'panel') liftCmd(w.id); } };
     }
+    // coisa do térreo na mira: o clique faz o que o prédio mandar (e às vezes vira uma pose: sentar, deitar, brinquedo, nadar)
+    function propInter(g) {
+      const riding = function () { return !!(player.pose && player.pose.owner === g.id); };
+      return { label: function () { return GROUND.props.label(g.id, g.point, riding()); },
+        act: function () {
+          const r = GROUND.props.act(g.id, g.point, riding());
+          markDirty();
+          if (!r) return;
+          if (r.stand) { if (player.pose) standUp(); return; }
+          if (r.pose) sitOrLie(worldPose(r.pose, g.id));
+        } };
+    }
     function setWallsLow(low) { state.wallsLow = low; buildArchitecture(low ? H_LOW : H_HIGH); syncUI(); }
 
     /* ---------------- visitante: andar, voar, deitar, sentar ---------------- */
@@ -3094,16 +3112,56 @@
     }
     function sitOrLie(ps) {
       if (!immersive()) return;
-      if (view === 'free') { view = 'walk'; ceilGroup.visible = true; }
+      if (view === 'free') { view = 'walk'; ceilGroup.visible = level === 'apt'; }
+      if (player.pose && player.pose !== ps) endPose(player.pose);
       player.target = null; player.vel.set(0, 0, 0); player.pose = ps;
-      tweenPlayer(new THREE.Vector3(wx(ps.at[0]), ps.y, wz(ps.at[1])), ps.yaw, ps.pitch, 950, null);
+      if (ps.world) { ps.ready = false; tweenPlayer(ps.at3.clone(), ps.yaw, ps.pitch, ps.swim ? 1100 : 900, function () { ps.ready = true; }); }
+      else tweenPlayer(new THREE.Vector3(wx(ps.at[0]), ps.y, wz(ps.at[1])), ps.yaw, ps.pitch, 950, null);
       syncUI();
     }
     function standUp() {
       const ps = player.pose; if (!ps) return;
       player.pose = null;
-      tweenPlayer(new THREE.Vector3(wx(ps.stand[0]), EYE, wz(ps.stand[1])), player.yaw, -0.05, 750, null);
+      endPose(ps);
+      if (ps.world) {
+        let st = ps.stand3;
+        if (ps.swim) st = swimExit(ps);
+        else if (ps.standAt) { try { const a = ps.standAt(); st = vL([a[0], 0, a[1]]); } catch (e) { /* fica o de antes */ } }
+        tweenPlayer(new THREE.Vector3(st.x, baseY() + EYE, st.z), player.yaw, -0.05, ps.swim ? 900 : 750, null);
+      } else tweenPlayer(new THREE.Vector3(wx(ps.stand[0]), EYE, wz(ps.stand[1])), player.yaw, -0.05, 750, null);
       syncUI();
+    }
+    // a pose acabou (levantou, desceu do brinquedo, saiu da visita): o prédio para a animação daquela coisa
+    function endPose(ps) { if (ps && ps.onEnd) { const f = ps.onEnd; ps.onEnd = null; try { f(); } catch (e) { console.error(e); } } }
+    // pose no mundo (térreo do condomínio): o prédio manda em metros do mundo; aqui vira coordenada da maquete
+    const ROT_SIGN = U ? (Math.sign(U.elements[0] * U.elements[10]) || 1) : 1;
+    function worldPose(sp, owner) {
+      const at = vL(sp.eye), d = vL(sp.look).sub(at).normalize();
+      return { world: true, kind: sp.kind || 'sit', hud: sp.hud || null, standLabel: sp.standLabel || null, at3: at, yaw: Math.atan2(d.x, d.z), pitch: Math.asin(clamp(d.y, -1, 1)),
+        stand3: vL([sp.stand[0], 0, sp.stand[1]]), standAt: sp.standAt || null, follow: sp.follow || null,
+        swim: sp.swim ? { q: rectL(sp.swim.area), y: vL([0, sp.swim.y, 0]).y } : null, onEnd: sp.onEnd || null, ready: false, owner: owner };
+    }
+    // saindo da piscina: pela borda mais perto, um passo para fora (se ali estiver livre)
+    function swimExit(ps) {
+      const q = ps.swim.q, x = player.pos.x, z = player.pos.z;
+      const opts = [[x - q[0], q[0] - 0.8, z], [q[2] - x, q[2] + 0.8, z], [z - q[1], x, q[1] - 0.8], [q[3] - z, x, q[3] + 0.8]].sort(function (a, b) { return a[0] - b[0]; });
+      for (let i = 0; i < opts.length; i++) if (!isBlocked(opts[i][1], opts[i][2])) return new THREE.Vector3(opts[i][1], 0, opts[i][2]);
+      return ps.stand3;
+    }
+    function swimStep(ps, f, s, run, dt, now) {
+      const q = ps.swim.q;
+      let dx = 0, dz = 0;
+      if (Math.abs(f) > 0.05 || Math.abs(s) > 0.05) {
+        const sy = Math.sin(player.yaw), cy = Math.cos(player.yaw);
+        dx = sy * f - cy * s; dz = cy * f + sy * s;
+        const l = Math.hypot(dx, dz); if (l > 1) { dx /= l; dz /= l; }
+      }
+      const sp = run ? 1.3 : 0.75, a = Math.min(1, dt * 2.6);
+      player.vel.x += (dx * sp - player.vel.x) * a; player.vel.z += (dz * sp - player.vel.z) * a;
+      player.pos.x = clamp(player.pos.x + player.vel.x * dt, q[0] + 0.32, q[2] - 0.32);
+      player.pos.z = clamp(player.pos.z + player.vel.z * dt, q[1] + 0.32, q[3] - 0.32);
+      player.pos.y = ps.swim.y + Math.sin(now * 0.0021) * 0.025;
+      return true;
     }
     function stepPlayer(dt, now) {
       if (ptween) { stepPTween(now); return true; }
@@ -3121,7 +3179,20 @@
       const run = keys.has('ShiftLeft') || keys.has('ShiftRight');
       if (turn) player.yaw += turn * 1.9 * dt;
       const hasMove = Math.abs(f) > 0.05 || Math.abs(s) > 0.05 || (view === 'free' && Math.abs(v) > 0.05);
-      if (player.pose) { if (hasMove) standUp(); return !!turn; }
+      if (player.pose) {
+        const ps = player.pose;
+        if (ps.swim && ps.ready) return swimStep(ps, f, s, run, dt, now) || !!turn;
+        if (hasMove) { standUp(); return !!turn; }
+        if (ps.follow && ps.ready) {
+          let w = null;
+          try { w = ps.follow(now); } catch (e) { console.error(e); }
+          if (!w) { standUp(); return true; }
+          player.pos.copy(vL(w.p));
+          if (w.dyaw) player.yaw += ROT_SIGN * w.dyaw;
+          return true;
+        }
+        return !!turn;
+      }
       if (view === 'walk') {
         let dx = 0, dz = 0;
         if (hasMove) {
@@ -3216,9 +3287,10 @@
       btn.tDoors.setAttribute('aria-pressed', String(state.doorsOpen));
       btn.tOverlay.setAttribute('aria-pressed', String(state.overlay));
       visitBar.hidden = !imm;
-      hudMode.textContent = view === 'free' ? 'Câmera livre' : player.pose ? (player.pose.kind === 'lie' ? 'Deitado' : 'Sentado') : 'Visitando';
+      hudMode.textContent = view === 'free' ? 'Câmera livre' : player.pose ? (player.pose.hud || (player.pose.kind === 'lie' ? 'Deitado' : 'Sentado')) : 'Visitando';
       visitName.textContent = currentRoom ? currentRoom.name : 'Fora do apartamento';
       standBtn.hidden = !player.pose;
+      standBtn.textContent = player.pose && player.pose.standLabel ? player.pose.standLabel : 'Levantar';
       Object.keys(roomButtons).forEach(function (id) { roomButtons[id].setAttribute('aria-current', String(imm && !!currentRoom && currentRoom.id === id)); });
       touchEl.hidden = !(coarse && imm);
       crosshair.hidden = !mouseAim();
@@ -3228,7 +3300,8 @@
       let h;
       const kb = !coarse;
       const mouseHow = locked ? 'Mova o mouse para olhar' : lockFailed ? 'Mova o mouse para olhar (encoste na borda para girar)' : 'Clique na tela para olhar com o mouse, sem segurar';
-      if (player.pose) h = kb ? mouseHow + ' · aperte W para levantar' : 'Arraste para olhar em volta · use o joystick ou Levantar para sair';
+      if (player.pose && player.pose.swim) h = kb ? mouseHow + ' · WASD nada · Shift nada mais rápido · ' + (player.pose.standLabel || 'Sair') + ' para sair' : 'Joystick nada · arraste para olhar · ' + (player.pose.standLabel || 'Sair') + ' para sair';
+      else if (player.pose) h = kb ? mouseHow + ' · aperte W para levantar' : 'Arraste para olhar em volta · use o joystick ou Levantar para sair';
       else if (view === 'walk') h = kb ? mouseHow + ' · WASD anda · clique para usar o que está na mira · Shift corre · Esc ' + (locked ? 'solta o mouse' : 'sai') : 'Joystick anda · arraste para olhar · toque nos objetos para usar ou no chão para ir até lá';
       else if (view === 'free') h = kb ? mouseHow + ' · WASD voa · E ou Espaço sobe · Q desce · Shift acelera · Esc ' + (locked ? 'solta o mouse' : 'sai') : 'Joystick voa · botões sobem e descem · arraste para olhar · toque nos objetos para usar';
       else h = coarse ? 'Um dedo gira 360° · pinça aproxima · dois dedos movem · toque num nome para entrar' : 'Arraste para girar 360° · role para aproximar · botão direito move a maquete · clique num nome para entrar';
@@ -3294,7 +3367,10 @@
       raycaster.setFromCamera(ndc, camW || camera);
       const hits = root.visible ? raycaster.intersectObjects(pickRoots, true) : [];
       // botões do elevador (no prédio): valem se estiverem mais perto que o que o apto tem na frente
-      const w = ELV && immersive() ? ELV.E.pick(raycaster) : null;
+      const w0 = ELV && immersive() ? ELV.E.pick(raycaster) : null;
+      // no térreo: salão, churrasqueiras, brinquedos, piscina, pet, bancos, portões (o prédio diz o que está na mira)
+      const g = GROUND && GROUND.props && level === 'ground' && immersive() ? GROUND.props.pick(raycaster) : null;
+      const w = w0 && g ? (w0.distance <= g.distance ? w0 : g) : (w0 || g);
       for (let i = 0; i < hits.length; i++) {
         const h = hits[i], o = h.object;
         if (o.userData.noPick || !visibleChain(o)) continue;
@@ -3303,7 +3379,7 @@
         let q = o; while (q && !q.userData.inter) q = q.parent;
         return { hit: h, inter: q ? q.userData.inter : null };
       }
-      if (w) return { hit: { distance: w.distance, point: new THREE.Vector3(), object: { userData: {} } }, inter: liftInter(w) };
+      if (w) return { hit: { distance: w.distance, point: new THREE.Vector3(), object: { userData: {} } }, inter: w === g ? propInter(g) : liftInter(w) };
       return null;
     }
     function showTip(text, x, y) {
@@ -3680,7 +3756,7 @@
       roomLights: roomLights, setRoomLight: setRoomLight, fillC: fillC, fillT: fillT, toiletState: toiletState, flush: flush, daylight: daylight, windowOpenness: windowOpenness,
       lightRig: lightRig, pointZones: pointZones, spotZones: spotZones, APT_U: APT_U, aptPatch: aptPatch, getAptLevel: function () { return aptLevel; }, landInfo: landInfo, xmas: xmas, setXmas: setXmas, XMAS_CORNER: XMAS_CORNER, M: M, sliders: sliders, acs: acs, mirrors: mirrors, consoleState: consoleState, setConsole: setConsole, getEstarTv: function () { return estarTv; },
       landGroup: landGroup, sky: sky, sunSprite: sunSprite, lampState: lampState, ceilGroup: ceilGroup, SUN_DIR: SUN_DIR, GROUND_Y: GROUND_Y, ZONE_RECTS: ZONE_RECTS, shutterBottomOf: shutterBottomOf,
-      U: U, UINV: UINV, scene: scene, camera: camera, teleport: teleport, liftSpot: liftSpot, liftCmd: liftCmd, lift: lift, ELV: ELV, getLevel: function () { return level; }, getFloor: function () { return visitFloor; }, GROUND: GROUND });
+      U: U, UINV: UINV, scene: scene, camera: camera, teleport: teleport, clickCenter: function () { const c = centerXY(); clickAt(c.x, c.y); }, pickCenter: function () { const c = centerXY(), r = pick(c.x, c.y); return r && r.inter ? r.inter.label(r.hit) : null; }, getPose: function () { return player.pose ? { hud: player.pose.hud, kind: player.pose.kind, ready: player.pose.ready } : null; }, liftSpot: liftSpot, liftCmd: liftCmd, lift: lift, ELV: ELV, getLevel: function () { return level; }, getFloor: function () { return visitFloor; }, GROUND: GROUND });
     /* ---------------- noite (tema escuro do site): sem sol, luzes dos cômodos acesas ---------------- */
     function setNight(on) {
       dayK = on ? 0 : 1;

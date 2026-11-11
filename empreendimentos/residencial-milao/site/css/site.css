@@ -436,6 +436,8 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .canvas-box:has(.apt-hud.is-locked) #predio { cursor: none; }
 .canvas-box:fullscreen { background: var(--bg); }
 .room-btn.is-corr { border-top: 1px dashed var(--line); border-radius: 0 0 10px 10px; margin-top: 4px; }
+.room-btn.is-corr.is-sub { border-top: 0; margin-top: 0; padding-left: 26px; position: relative; }
+.room-btn.is-sub::before { content: ""; position: absolute; left: 13px; top: 50%; width: 6px; height: 6px; border-radius: 50%; background: var(--gold, currentColor); transform: translateY(-50%); opacity: .8; }
 @media (max-width: 759px) { .apt-labels .pill i { display: none; } }
 .explorer.is-apto .hero-copy, .explorer.is-apto .stage-tools, .explorer.is-apto .stage-hint, .explorer.is-apto .labels, .explorer.is-apto .tip { display: none; }
 .explorer.is-apto .legend { display: none; }

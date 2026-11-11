@@ -250,6 +250,7 @@
           $('aptHud').hidden = false;
           $('aptRes').hidden = !lugar.reservado;
           apto.temElevador = !!(lugar.elevator && lugar.ground);
+          apto.lazer = lugar.ground && lugar.ground.spots ? lugar.ground.spots : [];
           apto.engine = window.AptEngine.create({
             tipo: u.tipo, andar: u.andar, apto: u.num, torre: u.torre, base: 'apartamento/',
             integrated: lugar, renderer: predio.renderer, canvas: predio.canvas, dom: hudDom(), onMessage: mensagemApto
@@ -284,7 +285,7 @@
   $('btnSairApto').addEventListener('click', sairApto);
   $('aptoComodos').addEventListener('click', function (ev) {
     const b = ev.target.closest('[data-room]'); if (!b || !apto || !apto.engine) return;
-    if (b.dataset.room === 'terreo') { apto.engine.teleport('terreo'); return; }
+    if (b.dataset.room === 'terreo' || b.dataset.room.indexOf('terreo:') === 0) { apto.engine.teleport(b.dataset.room); return; }
     if (b.dataset.room === 'elevador') { apto.engine.teleport('hall'); return; }
     apto.engine.room(b.dataset.room);
   });
@@ -350,9 +351,10 @@
       apto.pronto = true;
       avisoEntrada('');
       $('aptoTotal').textContent = d.comodos + ' m²';
-      const lista = d.rooms.concat(apto.temElevador ? [{ id: 'elevador', name: 'Hall do elevador', area: '', dims: '', nota: 'chamar e descer' }, { id: 'terreo', name: 'Térreo do condomínio', area: '', dims: '', nota: 'ir direto' }] : []);
+      const lista = d.rooms.concat(apto.temElevador ? [{ id: 'elevador', name: 'Hall do elevador', area: '', dims: '', nota: 'chamar e descer' }, { id: 'terreo', name: 'Térreo do condomínio', area: '', dims: '', nota: 'ir direto' }]
+        .concat((apto.lazer || []).map(function (s) { return { id: 'terreo:' + s.id, name: s.name, area: '', dims: '', nota: 'lazer · ir direto', sub: true }; })) : []);
       $('aptoComodos').innerHTML = lista.map(function (r) {
-        return '<li><button type="button" class="room-btn' + (r.id === 'corredor' || r.id === 'terreo' || r.id === 'elevador' ? ' is-corr' : '') + '" data-room="' + esc(r.id) + '"><span class="rn">' + esc(r.name) + '</span>' +
+        return '<li><button type="button" class="room-btn' + (r.id === 'corredor' || r.id.indexOf('terreo') === 0 || r.id === 'elevador' ? ' is-corr' : '') + (r.sub ? ' is-sub' : '') + '" data-room="' + esc(r.id) + '"><span class="rn">' + esc(r.name) + '</span>' +
           (r.area ? '<span class="ra">' + esc(r.area) + ' m²</span>' : '<span class="ra">' + (r.nota || 'fora do apto') + '</span>') +
           (r.dims ? '<span class="rd">' + esc(r.dims) + ' m</span>' : '') + '</button></li>';
       }).join('');
@@ -362,12 +364,13 @@
       apto.nivel = d.level || 'apt';
       const terreo = apto.nivel === 'ground', u = apto.u;
       document.querySelectorAll('#aptoComodos .room-btn').forEach(function (b) {
-        b.setAttribute('aria-current', String(!!d.imm && (terreo ? b.dataset.room === 'terreo' : d.room === 'elevador' ? b.dataset.room === 'elevador' : d.room === b.dataset.room)));
+        const lz = terreo && (apto.lazer || []).some(function (s) { return s.id === d.room; });
+        b.setAttribute('aria-current', String(!!d.imm && (terreo ? b.dataset.room === (lz ? 'terreo:' + d.room : 'terreo') : d.room === 'elevador' ? b.dataset.room === 'elevador' : d.room === b.dataset.room)));
       });
       $('aptoDica').textContent = d.room === 'elevador'
         ? 'Você está no elevador. Aperte o andar no painel (T é o térreo; o seu apto fica no ' + u.andar + 'º): a porta fecha, a cabine anda e abre no andar escolhido.'
         : terreo
-          ? 'Você está no térreo do condomínio: piscina, salão de festas, quiosques, pracinha, espaço pet e portaria. Para subir, entre no hall da Torre ' + u.torre + ' (a porta de vidro abre sozinha), chame o elevador e escolha o ' + u.andar + 'º andar.'
+          ? 'Você está no térreo do condomínio. Dá para usar quase tudo: no salão de festas (a porta de vidro abre sozinha), acender as luzes, ligar a TV, a churrasqueira e a torneira, abrir a geladeira e sentar; nos quiosques, acender as churrasqueiras; na pracinha, andar de balanço, descer o escorregador, brincar na gangorra, no gira-gira e no cavalinho; na piscina, deitar na espreguiçadeira, abrir e fechar o guarda-sol, ligar a ducha e entrar na água; no espaço pet, abrir a torneira do pet care; na portaria, abrir os portões. Para subir, entre no hall da Torre ' + u.torre + ', chame o elevador e escolha o ' + u.andar + 'º andar.'
           : apto.nivel === 'floor'
             ? 'Este é outro andar: as portas dos vizinhos ficam fechadas. Volte ao elevador, chame e escolha o ' + u.andar + 'º andar para voltar ao apto.'
             : d.imm

@@ -3232,11 +3232,24 @@
       else if (view === 'walk') h = kb ? mouseHow + ' · WASD anda · clique para usar o que está na mira · Shift corre · Esc ' + (locked ? 'solta o mouse' : 'sai') : 'Joystick anda · arraste para olhar · toque nos objetos para usar ou no chão para ir até lá';
       else if (view === 'free') h = kb ? mouseHow + ' · WASD voa · E ou Espaço sobe · Q desce · Shift acelera · Esc ' + (locked ? 'solta o mouse' : 'sai') : 'Joystick voa · botões sobem e descem · arraste para olhar · toque nos objetos para usar';
       else h = coarse ? 'Um dedo gira 360° · pinça aproxima · dois dedos movem · toque num nome para entrar' : 'Arraste para girar 360° · role para aproximar · botão direito move a maquete · clique num nome para entrar';
+      if (imm && hintSeen()) h = '';                           // depois do primeiro clique (ou toque) na visita, a dica some de vez
       hint.textContent = h;
       notifyView();
       if (EMBED || opts.onMessage) postParent({ type: 'apt:state', view: view, imm: imm, pose: !!player.pose, room: currentRoom ? currentRoom.id : null,
         roomName: currentRoom ? currentRoom.name : '', level: level, lift: liftSpot(),
         rotate: !!controls.autoRotate, wallsLow: state.wallsLow, furniture: state.furniture, labels: state.labels, doorsOpen: state.doorsOpen, overlay: state.overlay, hint: h });
+    }
+    // dica da visita (clique na tela para olhar…): aparece só até o primeiro clique ou toque dentro da visita
+    function hintSeen() {
+      if (window.__aptDicaVista) return true;
+      try { if (localStorage.getItem('milao.dicaVisita') === '1') window.__aptDicaVista = true; } catch (e) { /* sem armazenamento */ }
+      return !!window.__aptDicaVista;
+    }
+    function markHintSeen() {
+      if (hintSeen()) return;
+      window.__aptDicaVista = true;
+      try { localStorage.setItem('milao.dicaVisita', '1'); } catch (e) { /* sem armazenamento */ }
+      syncUI();
     }
     function postParent(msg) {
       if (opts.onMessage) { try { opts.onMessage(msg); } catch (e) { console.error(e); } return; }
@@ -3336,6 +3349,7 @@
     let drag = null;
     on(canvas, 'pointerdown', function (e) {
       if (!immersive() || tween) return;
+      markHintSeen();
       if (e.pointerType === 'mouse') {
         if (e.button !== 0) return;
         if (!locked && !lockFailed) { requestLock(); return; }

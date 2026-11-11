@@ -2208,10 +2208,13 @@
         // fora do andar do apto (térreo, outro andar, dentro do elevador andando) a torre aparece inteira, com o andar do apto fechado
         const ground = inApt && lvl !== 'apt', full = inApt && apt.view === 'walk' && !ground;
         const walking = inApt && (apt.view === 'walk' || apt.view === 'free');
-        const allIn = !open || ground;                              // torre inteira: a malha juntada
+        // andar que fica vazado para quem está dentro dele: o do apto (visita a pé) ou o outro andar onde o elevador parou
+        // (fechado, as faces internas das alas tapavam a passagem do hall para os corredores)
+        const hideLv = full ? open : walking && lvl === 'floor' ? apt.floor : 0;
+        const allIn = (!open || ground) && !hideLv;                 // torre inteira: a malha juntada
         tw.whole.visible = allIn;
         tw.slices.forEach(function (m, lv) {
-          const on = allIn || lv < open || (full && lv > open);
+          const on = allIn || (hideLv ? lv !== hideLv : lv < open);
           m.visible = on && !allIn;
           m.children.forEach(function (c) { c.userData.on = on; });   // o mouse ainda acha o andar na torre inteira
           if (tw.resv[lv]) tw.resv[lv].visible = on;
@@ -2221,7 +2224,7 @@
           const ls = im.userData.ls;
           if (!im.userData.all) im.userData.all = im.instanceMatrix.array.slice();
           im.instanceMatrix.array.set(im.userData.all);
-          if (full) im.instanceMatrix.array.fill(0, ls[open] * 16, ls[open + 1] * 16);   // a sacada e as janelas do próprio andar vêm da maquete
+          if (hideLv) im.instanceMatrix.array.fill(0, ls[hideLv] * 16, ls[hideLv + 1] * 16);   // a sacada e as janelas do andar vazado
           im.instanceMatrix.needsUpdate = true;
           im.count = open && !full && !ground ? ls[open] : ls[LEVELS];
         });

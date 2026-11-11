@@ -39,8 +39,8 @@ Fonte: [balizaconstrutora.com.br/empreendimentos/residencial-milao](https://bali
 
 A construtora não publica o número de torres, andares e apartamentos por andar. Pelas fachadas e fotos aéreas, o site usa:
 
-- **2 torres lado a lado** junto ao muro do fundo do terreno (casas da Rua Gastão atrás), quase alinhadas (a B 1,5 m à frente), viradas para o estacionamento e o lazer;
-- cada torre tem **duas alas desencontradas** ligadas pelo núcleo de elevadores e escada (fotomontagens da Baliza): a ala leste (aptos 4 a 9) fica 4 m à frente da oeste, e o hall do núcleo liga os dois corredores;
+- **2 torres lado a lado** junto ao muro do fundo do terreno (casas da Rua Gastão atrás), alinhadas numa reta, viradas para o estacionamento e o lazer;
+- cada torre é uma **barra reta**: as duas alas de apartamentos ficam na mesma linha e só o **núcleo do meio** (elevadores e escada) é **recuado 1,5 m** da fachada, na frente e nos fundos; o corredor atravessa a torre inteira e as portas dos elevadores dão para ele, de frente para a porta da escada;
 - **térreo + 12 andares**, **12 apartamentos por andar** = 288 unidades;
 - apartamentos `n01` a `n12` em cada andar `n` (101 a 1212), batendo com as plantas publicadas: **Apto Canto-101** (com sacada) e **Apto Meio-103** (sem sacada);
 - posições 1 a 6 na frente e 7 a 12 nos fundos; os 4 cantos (1, 6, 7, 12) têm sacada, na ponta do prédio;
@@ -58,7 +58,7 @@ Montado a partir da imagem de satélite da obra (Rua Marieta Fialho Blessmann, F
 - **portaria** com o pilar MILÃO, marquise escura com testeira azul, guarita envidraçada, portão de carros e de pedestres, **de frente para a Torre A** (o acesso de carros sai do portão direto na entrada dela);
 - rua interna com **estacionamento descoberto** dos dois lados (vagas com faixa amarela, carros em metade delas) e faixas de pedestre na frente das entradas;
 - passeio de tijolinho com a faixa azul-marinho junto às torres (render "Rua Interna"), postes e bicicletários;
-- **entrada de cada torre** sob o núcleo: pórtico azul-marinho e a letra gigante amarela (A e B), como no render "Acesso"; atrás da porta de vidro automática, o **hall de entrada** com as caixas de correio, um banco e as portas de trás dos dois elevadores (a cabine tem porta dupla: a da frente abre nos andares, a de trás no térreo);
+- **entrada de cada torre** no recuo do núcleo: pórtico azul-marinho e a letra gigante amarela (A e B), como no render "Acesso"; atrás da porta de vidro automática, o **hall de entrada** com as caixas de correio, um banco e as portas de trás dos dois elevadores (a cabine tem porta dupla: a da frente abre nos andares, a de trás no térreo);
 - **piscina** adulto (1,40 m) e infantil (0,45 m) com tanque de pastilha, faixa escura na linha d'água, luzes embaixo d'água, borda de pedra, deque, espreguiçadeiras, guarda-sóis, ducha, escadinha e cerca de vidro; **salão de festas** ao lado, com a frente de vidro e a faixa azul-marinho no alto (render da piscina), mesas com toalha, cadeiras, luminárias pendentes e balcão da copa;
 - **quiosques** com churrasqueira, bancada e mesa, pérgola de madeira; **pracinha** com torre, escorregador, balanço, gangorra e gira-gira; **espaço pet** cercado com rampa, obstáculos e túnel;
 - **reservatórios** azuis na ponta oeste (fotomontagens), abrigo de lixo junto à portaria;

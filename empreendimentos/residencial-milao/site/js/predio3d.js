@@ -30,13 +30,14 @@
   const UNIT_X = { 1: [-26.6, -18.9], 2: [-17.4, -9.6], 3: [-9.6, -1.8], 4: [1.8, 9.6], 5: [9.6, 17.4], 6: [18.9, 26.6] };
   const LOGGIA = 2.4, LOGGIA_IN = 0.1;   // sacada do apto de canto (2,36 m na planta), a 10 cm da ponta
 
-  // cada torre tem duas alas desencontradas ligadas pelo núcleo (elevadores e escada), como nas fotomontagens da Baliza:
-  // a ala leste (aptos 4–9) avança 4 m para a frente; o núcleo fica no meio do caminho entre as duas
-  const WING_DZ = 4;
+  // cada torre é uma barra reta: as duas alas de apartamentos ficam na mesma linha e só o núcleo do meio (elevadores e escada)
+  // é recuado da fachada, na frente e nos fundos, como no site da Baliza. WING_DZ fica 0 (alas alinhadas).
+  const WING_DZ = 0;
+  const CORE_IN = 1.5;                       // recuo do núcleo em relação às alas
   const PARTS = [
     { id: 'W', x0: -HL, x1: -1.8, z0: -HD, z1: HD },
-    { id: 'C', x0: -1.8, x1: 1.8, z0: -HD + WING_DZ / 2, z1: HD + WING_DZ / 2 },
-    { id: 'E', x0: 1.8, x1: HL, z0: -HD + WING_DZ, z1: HD + WING_DZ }
+    { id: 'C', x0: -1.8, x1: 1.8, z0: -HD + CORE_IN, z1: HD - CORE_IN },
+    { id: 'E', x0: 1.8, x1: HL, z0: -HD, z1: HD }
   ];
   function dzAt(x) { return x > 1.8 - 1e-6 ? WING_DZ : x < -1.8 + 1e-6 ? 0 : WING_DZ / 2; }   // eixo do corredor em cada ala
   function partAt(x) { return x < -1.8 ? PARTS[0] : x > 1.8 ? PARTS[2] : PARTS[1]; }
@@ -45,12 +46,14 @@
   // A cabine tem duas portas: a da frente abre nos andares, a de trás no térreo, para o hall de entrada da torre.
   const ZE = WING_DZ + CORR;                 // face do hall dos elevadores (parede azul-marinho)
   const LIFT = { x: 0.85, x2: -0.85, half: 0.45, in0: ZE + 0.17, in1: ZE + 1.53, w: 0.76, h: 2.32, rear: ZE + 1.72 };
-  const ENTRY_Z = HD + WING_DZ / 2;          // frente do núcleo: porta de vidro da torre
+  const ENTRY_Z = HD - CORE_IN;              // frente do núcleo (recuada): porta de vidro da torre
+  // hall de entrada no térreo, entre a parede de trás dos elevadores e a porta de vidro: caixas de correio, banco e vaso
+  const LOBBY = { mail: [LIFT.rear + 0.38, LIFT.rear + 2.18], bench: [LIFT.rear + 0.5, LIFT.rear + 1.8], plant: ENTRY_Z - 0.5 };
   // piso da cabine em cada parada (sistema da torre): térreo no piso do hall de entrada, andares no piso do corredor
   function stopY(n) { return n === 0 ? 0.06 : n * FH + 0.292; }
   // poços (núcleo e ventilação) no sistema da torre, para a laje do andar aberto e a planta do painel
   const SHAFTS = [
-    [-1.8, WING_DZ + CORR, 1.8, WING_DZ / 2 + HD - 0.5, 'elev'], [-1.8, -HD + WING_DZ / 2 + 0.5, 1.8, -CORR, 'escada'],
+    [-1.8, CORR, 1.8, HD - CORE_IN - 0.4, 'elev'], [-1.8, -HD + CORE_IN + 0.4, 1.8, -CORR, 'escada'],
     [-18.9, CORR, -17.4, HD - 0.3, 'poco'], [-18.9, -HD + 0.3, -17.4, -CORR, 'poco'],
     [17.4, WING_DZ + CORR, 18.9, WING_DZ + HD - 0.3, 'poco'], [17.4, WING_DZ - HD + 0.3, 18.9, WING_DZ - CORR, 'poco']
   ];
@@ -76,11 +79,10 @@
     return { cx: (r.x0 + r.x1) / 2, cz: (pose.front ? HD - dm.d / 2 : -HD + dm.d / 2) + r.dz, w: dm.w, d: dm.d, sx: sx, sz: sz, front: pose.front, mirror: pose.mirror };
   }
 
-  // as duas torres ficam lado a lado ao longo do muro do fundo do terreno, de frente para o estacionamento e o lazer
-  // (imagem de satélite e fotomontagens: quase alinhadas, a B 1,5 m mais à frente)
+  // as duas torres ficam lado a lado ao longo do muro do fundo do terreno, alinhadas numa reta, de frente para o estacionamento e o lazer
   const TOWERS = [
     { id: 'A', x: -29.5, z: 0 },
-    { id: 'B', x: 29.5, z: 1.5 }
+    { id: 'B', x: 29.5, z: 0 }
   ];
 
   const C = {
@@ -348,10 +350,8 @@
     for (let z = 9.5; z < 15.5; z += 0.12) { g.fillStyle = 'rgba(255,230,210,.10)'; g.fillRect(X(-80), Z(z), 141 * SITE_PX, 1); }
     rect(SURF.navy, -80, 14.6, 61, 15.5);
     TOWERS.forEach(function (t) {                                   // a calçada da torre volta a ser lisa junto à fachada
-      rect(SURF.walk, t.x - HL - 1.2, t.z - HD - 1.2, t.x - 1.8, t.z + HD + 1.2);
-      rect(SURF.walk, t.x - 1.8, t.z - HD + 2 - 1.2, t.x + 1.8, t.z + HD + 2 + 1.2);
-      rect(SURF.walk, t.x + 1.8, t.z - HD + WING_DZ - 1.2, t.x + HL + 1.2, t.z + HD + WING_DZ + 1.2);
-      rect(SURF.paving, t.x - 3.2, t.z + HD + 2, t.x + 3.2, 15.5);      // chegada à entrada da torre
+      rect(SURF.walk, t.x - HL - 1.2, t.z - HD - 1.2, t.x + HL + 1.2, t.z + HD + 1.2);
+      rect(SURF.paving, t.x - 3.2, t.z + ENTRY_Z, t.x + 3.2, 15.5);      // chegada à entrada da torre (pelo recuo do núcleo)
     });
     // rua interna, acesso e vagas (faixas amarelas)
     rect(SURF.asphalt, ROAD.x0, ROAD.z0, ROAD.x1, ROAD.z1);
@@ -1042,7 +1042,8 @@
         solid(X(-1.9), Z(LIFT.rear - 0.14), X(LIFT.x - LIFT.half), Z(LIFT.rear));
         solid(X(LIFT.x + LIFT.half), Z(LIFT.rear - 0.14), X(1.9), Z(LIFT.rear));
         solid(X(-1.9), Z(LIFT.rear), X(-1.68), Z(ENTRY_Z + 0.1)); solid(X(1.68), Z(LIFT.rear), X(1.9), Z(ENTRY_Z + 0.1));
-        solid(X(-1.68), Z(7.42), X(-1.38), Z(9.28)); solid(X(1.18), Z(9.0), X(1.68), Z(9.6)); solid(X(1.3), Z(7.55), X(1.68), Z(8.95));
+        solid(X(-1.68), Z(LOBBY.mail[0] - 0.03), X(-1.38), Z(LOBBY.mail[1] + 0.03)); solid(X(1.18), Z(LOBBY.plant - 0.3), X(1.68), Z(LOBBY.plant + 0.3));
+        solid(X(1.3), Z(LOBBY.bench[0] - 0.05), X(1.68), Z(LOBBY.bench[1] + 0.05));
         solid(X(-1.9), Z(ENTRY_Z - 0.07), X(-0.8), Z(ENTRY_Z + 0.1)); solid(X(0.8), Z(ENTRY_Z - 0.07), X(1.9), Z(ENTRY_Z + 0.1));
         DOOR_SOLIDS[T.id] = [X(-0.8), Z(ENTRY_Z - 0.07), X(0.8), Z(ENTRY_Z + 0.1)];
         const zf = T.z + ENTRY_Z;                                  // frente do núcleo (porta de vidro do hall de entrada)
@@ -1054,9 +1055,10 @@
         [[-1.7, 0.0], [0, 1.7]].forEach(function (s) { rbox(lampHeads, [T.x + s[0] + 0.5, zf + 1.2, T.x + s[1] - 0.5, zf + 1.6], 3.47, 3.5, false, false); });   // luz embaixo do pórtico
         // letra gigante amarela sobre o canteiro, à esquerda de quem chega
         const lg = new THREE.ExtrudeGeometry(letterShape(T.id), { depth: 0.32, bevelEnabled: true, bevelThickness: 0.03, bevelSize: 0.03, bevelSegments: 1, curveSegments: 10 });
-        const letter = new THREE.Mesh(lg, S_.yellow); letter.scale.set(1.15, 1.15, 1); letter.position.set(T.x - 5.6, 0.55, zf + 1.6); letter.castShadow = true; siteG.add(letter);
-        rbox(S_.navy, [T.x - 7.2, zf + 1.3, T.x - 4.0, zf + 2.3], 0, 0.55, true);
-        for (let i = 0; i < 5; i++) bikes.push([T.x - 12 + i * 0.75, zf + 2.4]);
+        const zl = T.z + HD;                                         // linha da fachada das alas
+        const letter = new THREE.Mesh(lg, S_.yellow); letter.scale.set(1.15, 1.15, 1); letter.position.set(T.x - 5.6, 0.55, zl + 1.5); letter.castShadow = true; siteG.add(letter);
+        rbox(S_.navy, [T.x - 7.2, zl + 1.2, T.x - 4.0, zl + 2.2], 0, 0.55, true);
+        for (let i = 0; i < 5; i++) bikes.push([T.x - 12 + i * 0.75, zl + 2.2]);
       });
       // bicicletários: arcos de inox
       inst(new THREE.TorusGeometry(0.42, 0.03, 6, 16, Math.PI), S_.steel, bikes, function (p) { dm.position.set(p[0], 0, p[1]); });
@@ -1799,18 +1801,18 @@
       const nome = sign('torre' + T.id, 256, 64, function (c) { c.fillStyle = '#22318A'; c.fillRect(0, 0, 256, 64); c.fillStyle = '#E2B444'; c.font = '700 34px ' + FONT; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('TORRE ' + T.id, 128, 34); });
       const pn = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 0.225), nome); pn.position.set(0, 2.6, zb + 0.004); g.add(pn);
       // caixas de correio (oeste), vaso com planta e banco (leste), forro com luzes, rodapé
-      add(elMats.caixas, -1.68, -1.42, 7.45, 9.25, 0.95, 2.05);
-      add(corrMats.dark, -1.68, -1.40, 7.42, 9.28, 0.92, 0.95);
-      const vaso = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.17, 0.56, 24), corrMats.dark); vaso.position.set(1.41, 0.34, 9.3); g.add(vaso);
-      const folhas = new THREE.Group(); folhas.position.set(1.41, 0.62, 9.3); g.add(folhas);
+      add(elMats.caixas, -1.68, -1.42, LOBBY.mail[0], LOBBY.mail[1], 0.95, 2.05);
+      add(corrMats.dark, -1.68, -1.40, LOBBY.mail[0] - 0.03, LOBBY.mail[1] + 0.03, 0.92, 0.95);
+      const vaso = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.17, 0.56, 24), corrMats.dark); vaso.position.set(1.41, 0.34, LOBBY.plant); g.add(vaso);
+      const folhas = new THREE.Group(); folhas.position.set(1.41, 0.62, LOBBY.plant); g.add(folhas);
       const folhaM = std({ color: 0x3F7A3A, roughness: 0.7, side: THREE.DoubleSide });
       for (let i = 0; i < 9; i++) {                                          // costela-de-adão: folhas largas em hastes
         const f = new THREE.Mesh(new THREE.CircleGeometry(0.17, 12), folhaM), a = i * 2.4;
         f.position.set(Math.cos(a) * 0.17, 0.35 + (i % 3) * 0.22, Math.sin(a) * 0.17); f.rotation.set(-0.9 + (i % 2) * 0.3, -a + Math.PI / 2, 0); f.scale.set(1, 1.3, 1);
         folhas.add(f);
       }
-      add(corrMats.door, 1.32, 1.68, 7.6, 8.9, 0.45, 0.5); [7.7, 8.8].forEach(function (z) { add(corrMats.dark, 1.36, 1.64, z - 0.03, z + 0.03, 0.06, 0.45); });
-      [[-0.9, 8.0], [0.9, 8.0], [0, 9.2]].forEach(function (p) { add(elMats.light, p[0] - 0.22, p[0] + 0.22, p[1] - 0.22, p[1] + 0.22, H - 0.01, H); });
+      add(corrMats.door, 1.32, 1.68, LOBBY.bench[0], LOBBY.bench[1], 0.45, 0.5); [LOBBY.bench[0] + 0.1, LOBBY.bench[1] - 0.1].forEach(function (z) { add(corrMats.dark, 1.36, 1.64, z - 0.03, z + 0.03, 0.06, 0.45); });
+      [[-0.9, zb + 0.95], [0.9, zb + 0.95], [0, zf - 0.7]].forEach(function (p) { add(elMats.light, p[0] - 0.22, p[0] + 0.22, p[1] - 0.22, p[1] + 0.22, H - 0.01, H); });
       add(corrMats.skirting, -1.68, -1.665, zb, zf, 0.06, 0.14); add(corrMats.skirting, 1.665, 1.68, zb, zf, 0.06, 0.14);
       // porta automática de vidro: duas folhas que correm para os lados, vidros fixos e caixilho escuro
       const glass = std({ color: 0xD5E3EE, roughness: 0.05, metalness: 0.2, transparent: true, opacity: 0.3, depthWrite: false });
@@ -2036,8 +2038,10 @@
       [[-1.8, LIFT.x2 - LIFT.half], [LIFT.x2 + LIFT.half, LIFT.x - LIFT.half], [LIFT.x + LIFT.half, 1.8]].forEach(function (s) { box(corrMats.navy, [s[0], ZE - 0.012, s[1], ZE + T], 0, hgt); });
       [LIFT.x2, LIFT.x].forEach(function (x) { box(corrMats.navy, [x - LIFT.half, ZE - 0.012, x + LIFT.half, ZE + T], 2.15, hgt, grp, false); });
       box(corrMats.wall, [-1.8, -CORR - T, 1.8, -CORR + 0.012], 0, hgt);
-      box(corrMats.wall, [-1.8 - T, CORR, -1.8 + 0.012, ZE], 0, hgt);            // lateral oeste (apto 3)
-      box(corrMats.wall, [1.8 - 0.012, -CORR, 1.8 + T, WING_DZ - CORR], 0, hgt);  // lateral leste (apto 9)
+      if (WING_DZ > 0) {                                                        // laterais do hall quando as alas são desencontradas
+        box(corrMats.wall, [-1.8 - T, CORR, -1.8 + 0.012, ZE], 0, hgt);
+        box(corrMats.wall, [1.8 - 0.012, -CORR, 1.8 + T, WING_DZ - CORR], 0, hgt);
+      }
       // ---------- hall dos elevadores: portas de inox com batente, indicador do andar do elevador, botão de chamada ----------
       const liftDoors = landingDoors(grp, y0, ZE - 0.012, -1, solids);
       box(corrMats.hall, [-1.8, ZE - 1.25, 1.8, ZE - 0.012], 0, 0.014, grp, false, false);       // faixa de porcelanato grafite em frente aos elevadores

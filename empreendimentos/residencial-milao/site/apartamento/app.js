@@ -628,6 +628,13 @@
       glass: std('#d2e6ee', { transparent: true, opacity: 0.2, roughness: 0.05, env: 1.5, depthWrite: false }),
       sillStone: std('#D7D2CA', { roughness: 0.5, env: 0.6 }),
       door: std('#F3F2EE', { roughness: 0.55, env: 0.5 }),
+      // porta de entrada em madeira, igual às dos vizinhos no corredor do prédio
+      doorWood: std('#ffffff', { map: canvasTex(128, 512, function (g, w, h) {
+        const r = rng(808);
+        g.fillStyle = '#A9784B'; g.fillRect(0, 0, w, h);
+        for (let x = 0; x < w; x++) { const k = Math.sin(x * 0.37) * 0.5 + Math.sin(x * 1.7 + 2) * 0.3 + (r() - 0.5) * 0.6; g.fillStyle = k > 0 ? 'rgba(70,40,18,' + (0.10 * k).toFixed(3) + ')' : 'rgba(255,225,180,' + (-0.08 * k).toFixed(3) + ')'; g.fillRect(x, 0, 1, h); }
+        for (let i = 0; i < 40; i++) { g.strokeStyle = 'rgba(80,46,20,.12)'; g.lineWidth = 1 + r(); const x = r() * w; g.beginPath(); g.moveTo(x, 0); g.bezierCurveTo(x + (r() - 0.5) * 14, h / 3, x + (r() - 0.5) * 14, h * 2 / 3, x + (r() - 0.5) * 10, h); g.stroke(); }
+      }), roughness: 0.55, env: 0.4 }),
       chrome: std('#D9DCE0', { roughness: 0.18, metalness: 0.9, env: 1.2 }),
       steel: std('#BCC0C4', { roughness: 0.32, metalness: 0.75, env: 1.0 }),
       steelIn: std('#A9ADB2', { roughness: 0.3, metalness: 0.8, env: 1.0, side: THREE.BackSide }),
@@ -1378,7 +1385,7 @@
       while (to - tc > Math.PI) to -= 2 * Math.PI;
       while (to - tc < -Math.PI) to += 2 * Math.PI;
       const w = sp.leaf, h = P.doorTop - 0.01, t = 0.035;
-      local(pivot, new THREE.BoxGeometry(w, h, t), M.door, w / 2, h / 2 + 0.006, 0);
+      local(pivot, new THREE.BoxGeometry(w, h, t), dr.id === 'entrada' ? M.doorWood : M.door, w / 2, h / 2 + 0.006, 0);
       [1, -1].forEach(function (sd) {
         local(pivot, new THREE.CylinderGeometry(0.026, 0.026, 0.012, 20), M.chrome, w - 0.065, 1.02, sd * (t / 2 + 0.006), [Math.PI / 2, 0, 0]);
         local(pivot, new THREE.CylinderGeometry(0.009, 0.009, 0.04, 12), M.chrome, w - 0.065, 1.02, sd * (t / 2 + 0.02), [Math.PI / 2, 0, 0]);

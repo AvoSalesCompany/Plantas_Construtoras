@@ -714,23 +714,80 @@
     /* ---------------- corredor do andar (aparece quando se visita um apartamento) ----------------
        Paredes do corredor pelo contorno de cada apto (o apto de canto tem um hall que avança), portas dos vizinhos com o número,
        portas dos elevadores e da escada, forro e luzes. Tudo em metros, no sistema da torre. */
+    // texturas do corredor, desenhadas em canvas: mesma linguagem das áreas comuns da Baliza (render "Acesso" e salão de festas do Milão):
+    // porcelanato claro, parede creme, porta de madeira, azul-marinho e dourado da marca, sinalização de incêndio
+    const CT = (function () {
+      const rep = function (t, rx, ry) { t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(rx, ry); return t; };
+      const R = rng(808);
+      const parede = canvas(4, 256), gp = parede.getContext('2d'), gr = gp.createLinearGradient(0, 0, 0, 256);
+      gr.addColorStop(0, '#DCD8D0'); gr.addColorStop(0.05, '#FFFFFF'); gr.addColorStop(0.82, '#FFFFFF'); gr.addColorStop(1, '#D6D1C8');
+      gp.fillStyle = gr; gp.fillRect(0, 0, 4, 256);
+      const piso = canvas(256, 256), pp = piso.getContext('2d');
+      pp.fillStyle = '#DAD6CE'; pp.fillRect(0, 0, 256, 256);
+      for (let i = 0; i < 900; i++) { pp.fillStyle = R() < 0.5 ? 'rgba(120,110,95,.06)' : 'rgba(255,255,255,.10)'; pp.fillRect(R() * 256, R() * 256, 2 + R() * 9, 1 + R() * 5); }
+      pp.fillStyle = '#B5AEA2'; pp.fillRect(0, 253, 256, 3); pp.fillRect(253, 0, 3, 256);
+      const madeira = canvas(128, 512), mp = madeira.getContext('2d');
+      mp.fillStyle = '#A9784B'; mp.fillRect(0, 0, 128, 512);
+      for (let x = 0; x < 128; x += 1) { const k = Math.sin(x * 0.37) * 0.5 + Math.sin(x * 1.7 + 2) * 0.3 + (R() - 0.5) * 0.6; mp.fillStyle = k > 0 ? 'rgba(70,40,18,' + (0.10 * k).toFixed(3) + ')' : 'rgba(255,225,180,' + (-0.08 * k).toFixed(3) + ')'; mp.fillRect(x, 0, 1, 512); }
+      for (let i = 0; i < 40; i++) { mp.strokeStyle = 'rgba(80,46,20,.12)'; mp.lineWidth = 1 + R(); const x = R() * 128; mp.beginPath(); mp.moveTo(x, 0); mp.bezierCurveTo(x + (R() - 0.5) * 14, 170, x + (R() - 0.5) * 14, 340, x + (R() - 0.5) * 10, 512); mp.stroke(); }
+      const inox = canvas(64, 256), ip = inox.getContext('2d');
+      ip.fillStyle = '#B7BCC2'; ip.fillRect(0, 0, 64, 256);
+      for (let x = 0; x < 64; x++) { ip.fillStyle = 'rgba(' + (R() < 0.5 ? '255,255,255' : '40,46,54') + ',' + (0.05 + R() * 0.08).toFixed(3) + ')'; ip.fillRect(x, 0, 1, 256); }
+      const veneziana = canvas(128, 256), vp = veneziana.getContext('2d');
+      vp.fillStyle = '#F2F1EE'; vp.fillRect(0, 0, 128, 256);
+      for (let y = 18; y < 230; y += 9) { vp.fillStyle = 'rgba(60,64,72,.22)'; vp.fillRect(10, y, 108, 3); vp.fillStyle = 'rgba(255,255,255,.8)'; vp.fillRect(10, y + 3, 108, 1); }
+      vp.fillStyle = '#3A3F49'; vp.font = '600 15px Archivo, Arial, sans-serif'; vp.textAlign = 'center'; vp.fillText('MEDIDORES', 64, 248);
+      const capacho = canvas(128, 96), cp = capacho.getContext('2d');
+      cp.fillStyle = '#34363B'; cp.fillRect(0, 0, 128, 96);
+      for (let i = 0; i < 700; i++) { cp.fillStyle = R() < 0.5 ? 'rgba(0,0,0,.25)' : 'rgba(255,255,255,.06)'; cp.fillRect(R() * 128, R() * 96, 1.5, 1.5); }
+      cp.strokeStyle = 'rgba(255,255,255,.12)'; cp.lineWidth = 4; cp.strokeRect(8, 8, 112, 80);
+      const luz = canvas(128, 128), lp = luz.getContext('2d'), lg = lp.createRadialGradient(64, 64, 0, 64, 64, 64);
+      lg.addColorStop(0, 'rgba(255,236,200,1)'); lg.addColorStop(0.45, 'rgba(255,236,200,.35)'); lg.addColorStop(1, 'rgba(255,236,200,0)');
+      lp.fillStyle = lg; lp.fillRect(0, 0, 128, 128);
+      const placa = function (w, h, draw) { const c = canvas(w, h), g = c.getContext('2d'); draw(g, w, h); return tex(c); };
+      return {
+        parede: tex(parede), piso: rep(tex(piso), (L - 0.4) / 0.6, 3.24 / 0.6), madeira: tex(madeira), inox: tex(inox), veneziana: tex(veneziana),
+        capacho: tex(capacho), luz: tex(luz, false), placa: placa
+      };
+    })();
     const corrMats = {
-      wall: std({ color: 0xE9E7E2, roughness: 0.9 }), ceil: std({ color: 0xF3F2EE, roughness: 0.95, emissive: 0xE9E6DF, emissiveIntensity: 0.32 }),
-      door: std({ color: 0xE4DFD6, roughness: 0.6 }), frame: std({ color: 0xBDB8AE, roughness: 0.7 }),
-      steel: std({ color: 0xB9BEC4, roughness: 0.45, metalness: 0.2 }), dark: std({ color: 0x2B2F36, roughness: 0.6 }),   // sem mapa de reflexo: metal pouco metálico para não ficar preto
-      handle: std({ color: 0xC9CDD2, roughness: 0.4, metalness: 0.25 })
+      wall: std({ color: 0xF3EEE5, map: CT.parede, roughness: 0.92 }),
+      navy: std({ color: 0x22318A, roughness: 0.85 }),
+      ceil: std({ color: 0xF4F3EF, roughness: 0.95, emissive: 0xE9E6DF, emissiveIntensity: 0.32 }),
+      floor: std({ map: CT.piso, roughness: 0.36, metalness: 0.02 }),
+      hall: std({ color: 0x4A4E55, roughness: 0.32 }),
+      skirting: std({ color: 0x77726A, roughness: 0.5 }),
+      door: std({ map: CT.madeira, roughness: 0.55 }),
+      frame: std({ color: 0xF2F0EB, roughness: 0.6 }),
+      fireDoor: std({ color: 0x5A5F67, roughness: 0.55 }),
+      steel: std({ map: CT.inox, roughness: 0.38, metalness: 0.25 }), dark: std({ color: 0x2B2F36, roughness: 0.6 }),
+      handle: std({ color: 0xC9CDD2, roughness: 0.35, metalness: 0.3 }),
+      white: std({ color: 0xF5F5F2, roughness: 0.5 }),
+      red: std({ color: 0xC0262D, roughness: 0.4 }),
+      louver: std({ map: CT.veneziana, roughness: 0.6 }),
+      mat: std({ map: CT.capacho, roughness: 0.98 }),
+      lamp: new THREE.MeshBasicMaterial({ color: lin(0xFFF3DE) }),
+      amber: new THREE.MeshBasicMaterial({ color: lin(0xFFB547) }),
+      pool: new THREE.MeshBasicMaterial({ map: CT.luz, color: lin(0xFFE9C7), transparent: true, opacity: 0.16, depthWrite: false, blending: THREE.AdditiveBlending }),
+      sky: new THREE.MeshBasicMaterial({ color: lin(0xDCE9F4) })
     };
-    const corrLights = [0, 1].map(function () { const l = new THREE.PointLight(0xFFEBD0, 0, 11, 2); scene.add(l); return l; });
-    const numTex = {};
-    function numberTex(n) {
-      if (numTex[n]) return numTex[n];
-      const c = canvas(128, 64), g = c.getContext('2d');
-      g.fillStyle = '#2B2F36'; g.fillRect(0, 0, 128, 64);
-      g.fillStyle = '#E9E7E2'; g.font = '600 38px "IBM Plex Mono", Menlo, monospace'; g.textAlign = 'center'; g.textBaseline = 'middle';
-      g.fillText(String(n), 64, 34);
-      numTex[n] = std({ map: tex(c), roughness: 0.5 });
-      return numTex[n];
+    // placas: número do apto, número do andar, direção, saída, extintor, hidrante, escada, indicador do elevador
+    const signMats = {};
+    function sign(key, w, h, draw, basic) {
+      if (!signMats[key]) {
+        const t = CT.placa(w, h, draw);
+        signMats[key] = basic ? new THREE.MeshBasicMaterial({ map: t, transparent: true, alphaTest: 0.05 }) : std({ map: t, roughness: 0.5, transparent: true, alphaTest: 0.05 });
+      }
+      return signMats[key];
     }
+    const FONT = 'Archivo, Arial, sans-serif', MONO = '"IBM Plex Mono", Menlo, monospace';
+    function numberTex(n) {
+      return sign('n' + n, 128, 64, function (g) {
+        g.fillStyle = '#22318A'; g.fillRect(0, 0, 128, 64);
+        g.fillStyle = '#E2B444'; g.font = '600 38px ' + MONO; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(String(n), 64, 34);
+      });
+    }
+    const corrLights = [0, 1, 2].map(function () { const l = new THREE.PointLight(0xFFEBD0, 0, 10, 2); scene.add(l); return l; });
     // retângulo da maquete (x0, z0, x1, z1 em metros da planta) -> retângulo na torre
     function toTower(pl, x0, z0, x1, z1) {
       const ax = pl.cx + pl.sx * x0, bx = pl.cx + pl.sx * x1, az = pl.cz + pl.sz * z0, bz = pl.cz + pl.sz * z1;
@@ -747,15 +804,24 @@
       const grp = new THREE.Group(); grp.visible = false; tw.plate.add(grp);
       const ceilG = new THREE.Group(); ceilG.visible = false; grp.add(ceilG);
       const solids = [];                     // retângulos de colisão (na torre)
-      const box = function (mat, r, h0, h1, parent, solid) {
+      const rodape = [];                     // rodapés (instanciados no fim)
+      const box = function (mat, r, h0, h1, parent, solid, shadow) {
         if (solid !== false) r = [r[0] - 0.012, r[1], r[2] + 0.012, r[3]];
-        const m = new THREE.Mesh(new THREE.BoxGeometry(Math.max(0.01, r[2] - r[0]), h1 - h0, Math.max(0.01, r[3] - r[1])), mat);
-        m.position.set((r[0] + r[2]) / 2, y0 + (h0 + h1) / 2, (r[1] + r[3]) / 2); m.castShadow = true; m.receiveShadow = true;
+        const m = new THREE.Mesh(new THREE.BoxGeometry(Math.max(0.005, r[2] - r[0]), h1 - h0, Math.max(0.005, r[3] - r[1])), mat);
+        m.position.set((r[0] + r[2]) / 2, y0 + (h0 + h1) / 2, (r[1] + r[3]) / 2);
+        m.castShadow = shadow !== undefined ? shadow : solid !== false; m.receiveShadow = true;
         (parent || grp).add(m);
         if (solid !== false) solids.push(r);
         return m;
       };
-      // paredes dos aptos voltadas para o corredor (o próprio apto vem da maquete; dele só se fecham os recuos do contorno)
+      // placa plana encostada numa parede: n = normal para o corredor ('+z', '-z', '+x', '-x'), centro (x, z), altura y0..y1
+      const panel = function (mat, x, z, w, h0, h1, n, parent) {
+        const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h1 - h0), mat);
+        m.rotation.y = { '+z': 0, '-z': Math.PI, '+x': Math.PI / 2, '-x': -Math.PI / 2 }[n];
+        m.position.set(x, y0 + (h0 + h1) / 2, z); (parent || grp).add(m);
+        return m;
+      };
+      // ---------- paredes dos aptos voltadas para o corredor, portas dos vizinhos ----------
       for (let pos = 1; pos <= 12; pos++) {
         const cp = corridorPlan(pos); if (!cp || !cp.P.corredor) continue;
         const segs = pos === own ? (cp.P.corredor.fecha || []) : cp.P.corredor.linha;
@@ -769,34 +835,132 @@
           }
         });
         if (pos === own) continue;
-        // porta de entrada do vizinho, com o número do apto
         const w = cp.P.walls.find(function (q) { return (q.open || []).some(function (o) { return o.door === 'entrada'; }); });
         if (!w) continue;
         const o = w.open.find(function (q) { return q.door === 'entrada'; }), zf = cp.Z(Math.max(w.r[1], w.r[3]));
-        box(corrMats.door, toTower(cp.pl, cp.X(o.a) + 0.04, zf - 0.01, cp.X(o.b) - 0.04, zf + 0.035), 0, 2.08, grp, false);
-        box(corrMats.frame, toTower(cp.pl, cp.X(o.a) - 0.02, zf - 0.005, cp.X(o.a) + 0.04, zf + 0.045), 0, 2.12, grp, false);
-        box(corrMats.frame, toTower(cp.pl, cp.X(o.b) - 0.04, zf - 0.005, cp.X(o.b) + 0.02, zf + 0.045), 0, 2.12, grp, false);
-        box(corrMats.frame, toTower(cp.pl, cp.X(o.a) - 0.02, zf - 0.005, cp.X(o.b) + 0.02, zf + 0.045), 2.08, 2.14, grp, false);
-        const hx = cp.X(cp.P.doors.entrada.hinge === 'a' ? o.b - 18 : o.a + 18);
-        box(corrMats.handle, toTower(cp.pl, hx - 0.07, zf + 0.035, hx + 0.07, zf + 0.06), 1.02, 1.05, grp, false);
-        const nx = cp.X((o.a + o.b) / 2);                                  // número em cima da porta
-        box(numberTex(andar * 100 + pos), toTower(cp.pl, nx - 0.11, zf, nx + 0.11, zf + 0.012), 2.19, 2.3, grp, false);
+        const A = cp.X(o.a), B = cp.X(o.b), mid = (A + B) / 2, hingeA = cp.P.doors.entrada.hinge === 'a';
+        // porta de madeira, batente branco, maçaneta de alavanca, olho mágico, número do apto em cima
+        box(corrMats.door, toTower(cp.pl, A + 0.04, zf - 0.01, B - 0.04, zf + 0.035), 0, 2.08, grp, false, false);
+        box(corrMats.frame, toTower(cp.pl, A - 0.03, zf - 0.005, A + 0.04, zf + 0.045), 0, 2.15, grp, false, false);
+        box(corrMats.frame, toTower(cp.pl, B - 0.04, zf - 0.005, B + 0.03, zf + 0.045), 0, 2.15, grp, false, false);
+        box(corrMats.frame, toTower(cp.pl, A - 0.03, zf - 0.005, B + 0.03, zf + 0.045), 2.08, 2.15, grp, false, false);
+        const hx = hingeA ? B - 0.12 : A + 0.12, hs = hingeA ? -1 : 1;
+        box(corrMats.handle, toTower(cp.pl, hx - 0.025, zf + 0.035, hx + 0.025, zf + 0.05), 0.97, 1.07, grp, false, false);
+        box(corrMats.handle, toTower(cp.pl, Math.min(hx, hx + hs * 0.13), zf + 0.05, Math.max(hx, hx + hs * 0.13), zf + 0.07), 1.01, 1.03, grp, false, false);
+        box(corrMats.dark, toTower(cp.pl, mid - 0.012, zf + 0.035, mid + 0.012, zf + 0.045), 1.5, 1.524, grp, false, false);
+        box(numberTex(andar * 100 + pos), toTower(cp.pl, mid - 0.11, zf, mid + 0.11, zf + 0.012), 2.22, 2.33, grp, false, false);
+        // interruptor de minuteria (luz do corredor) do lado da fechadura
+        const sx = cp.X(o.b + 16);
+        box(corrMats.white, toTower(cp.pl, sx - 0.04, zf, sx + 0.04, zf + 0.012), 1.16, 1.27, grp, false, false);
+        box(corrMats.amber, toTower(cp.pl, sx - 0.006, zf + 0.012, sx + 0.006, zf + 0.016), 1.235, 1.247, grp, false, false);
+        // capacho na frente de algumas portas
+        if (((pos * 37 + andar * 11) % 5) < 3) box(corrMats.mat, toTower(cp.pl, mid - 0.32, zf + 0.06, mid + 0.32, zf + 0.46), 0.012, 0.024, grp, false, false);
       }
-      // poços de ventilação e núcleo (elevadores na frente, escada nos fundos): face reta no corredor
+      // ---------- poços de ventilação (com o armário dos medidores) e núcleo ----------
       [[-18.9, -17.4], [-1.8, 1.8], [17.4, 18.9]].forEach(function (xr) {
-        [-1, 1].forEach(function (s) { box(corrMats.wall, s > 0 ? [xr[0], CORR - 0.012, xr[1], CORR + T] : [xr[0], -CORR - T, xr[1], -CORR + 0.012], 0, hgt); });
+        [-1, 1].forEach(function (s) {
+          const nucleoFrente = s > 0 && xr[0] === -1.8;
+          box(nucleoFrente ? corrMats.navy : corrMats.wall, s > 0 ? [xr[0], CORR - 0.012, xr[1], CORR + T] : [xr[0], -CORR - T, xr[1], -CORR + 0.012], 0, hgt);
+          if (xr[0] !== -1.8) {                                         // porta veneziana dos medidores de água e gás
+            const xc = (xr[0] + xr[1]) / 2, zf = s > 0 ? CORR - 0.012 : -CORR + 0.012;
+            box(corrMats.louver, [xc - 0.4, Math.min(zf, zf - s * 0.025), xc + 0.4, Math.max(zf, zf - s * 0.025)], 0.3, 1.9, grp, false, false);
+          }
+        });
       });
-      [-0.85, 0.85].forEach(function (x) {                                // portas dos elevadores
-        box(corrMats.dark, [x - 0.5, CORR - 0.032, x + 0.5, CORR], 0, 2.2, grp, false);
-        box(corrMats.steel, [x - 0.45, CORR - 0.042, x + 0.45, CORR - 0.005], 0, 2.12, grp, false);
-        box(corrMats.dark, [x - 0.003, CORR - 0.047, x + 0.003, CORR - 0.035], 0, 2.12, grp, false);
+      // ---------- hall dos elevadores: parede azul-marinho, portas de inox, indicador de andar, botoeira ----------
+      const ind = sign('ind' + andar, 128, 48, function (g) {
+        g.fillStyle = '#0B0D10'; g.fillRect(0, 0, 128, 48);
+        g.fillStyle = '#FF4436'; g.font = '700 30px ' + MONO; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(String(andar), 64, 25);
+        g.beginPath(); g.moveTo(22, 30); g.lineTo(30, 18); g.lineTo(38, 30); g.fill();
+      }, true);
+      [-0.85, 0.85].forEach(function (x) {
+        box(corrMats.dark, [x - 0.52, CORR - 0.032, x + 0.52, CORR], 0, 2.2, grp, false, false);
+        box(corrMats.steel, [x - 0.45, CORR - 0.042, x - 0.004, CORR - 0.005], 0, 2.12, grp, false, false);
+        box(corrMats.steel, [x + 0.004, CORR - 0.042, x + 0.45, CORR - 0.005], 0, 2.12, grp, false, false);
+        box(ind, [x - 0.15, CORR - 0.04, x + 0.15, CORR - 0.012], 2.27, 2.38, grp, false, false);
       });
-      box(corrMats.steel, [-0.08, CORR - 0.037, 0.08, CORR], 1.05, 1.3, grp, false);   // botoeira
-      box(corrMats.frame, [-0.52, -CORR, 0.52, -CORR + 0.057], 0, 2.14, grp, false);   // porta da escada
-      box(corrMats.door, [-0.46, -CORR, 0.46, -CORR + 0.062], 0, 2.08, grp, false);
-      box(corrMats.handle, [0.28, -CORR + 0.062, 0.4, -CORR + 0.087], 1.02, 1.05, grp, false);
-      [-1, 1].forEach(function (s) { box(corrMats.wall, s < 0 ? [-HL, -1.7, -HL + 0.2, 1.7] : [HL - 0.2, -1.7, HL, 1.7], 0, hgt); });   // pontas do corredor
-      box(corrMats.ceil, [-HL + 0.05, -1.62, HL - 0.05, 1.62], hgt, hgt + 0.08, ceilG, false);
+      box(corrMats.steel, [-0.06, CORR - 0.03, 0.06, CORR - 0.012], 1.0, 1.32, grp, false, false);   // botoeira
+      box(corrMats.amber, [-0.022, CORR - 0.04, 0.022, CORR - 0.03], 1.2, 1.235, grp, false, false);
+      box(corrMats.handle, [-0.022, CORR - 0.04, 0.022, CORR - 0.03], 1.09, 1.125, grp, false, false);
+      box(corrMats.hall, [-1.8, 0.2, 1.8, CORR - 0.012], 0, 0.014, grp, false, false);           // faixa de porcelanato grafite em frente aos elevadores
+      // ---------- escada: porta corta-fogo com barra antipânico, placa SAÍDA iluminada e luz de emergência ----------
+      const zb = -CORR + 0.012;
+      box(corrMats.frame, [-0.52, zb, 0.52, zb + 0.045], 0, 2.15, grp, false, false);
+      box(corrMats.fireDoor, [-0.46, zb, 0.46, zb + 0.05], 0, 2.1, grp, false, false);
+      box(corrMats.handle, [-0.36, zb + 0.08, 0.36, zb + 0.11], 0.98, 1.03, grp, false, false);
+      [-0.33, 0.33].forEach(function (x) { box(corrMats.handle, [x - 0.02, zb + 0.05, x + 0.02, zb + 0.08], 0.97, 1.04, grp, false, false); });
+      panel(sign('escada', 128, 48, function (g) {
+        g.fillStyle = '#F5F5F2'; g.fillRect(0, 0, 128, 48); g.fillStyle = '#C0262D'; g.font = '700 22px ' + FONT; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('ESCADA', 64, 25);
+      }), 0, zb + 0.052, 0.3, 1.5, 1.61, '+z');
+      box(sign('saida', 160, 64, function (g) {
+        g.fillStyle = '#0B8A43'; g.fillRect(0, 0, 160, 64); g.fillStyle = '#FFFFFF'; g.font = '800 28px ' + FONT; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('SAÍDA', 92, 34);
+        g.beginPath(); g.arc(24, 18, 5, 0, 6.3); g.fill(); g.lineWidth = 5; g.strokeStyle = '#FFFFFF'; g.lineCap = 'round';
+        g.beginPath(); g.moveTo(22, 25); g.lineTo(18, 40); g.lineTo(28, 52); g.moveTo(18, 40); g.lineTo(10, 52); g.moveTo(21, 30); g.lineTo(32, 34); g.moveTo(21, 30); g.lineTo(11, 33); g.stroke();
+      }, true), [-0.2, zb, 0.2, zb + 0.04], 2.2, 2.36, grp, false, false);
+      box(corrMats.white, [-0.17, zb, 0.17, zb + 0.07], 2.38, 2.46, grp, false, false);              // luz de emergência
+      [-0.09, 0.09].forEach(function (x) { box(corrMats.lamp, [x - 0.03, zb + 0.07, x + 0.03, zb + 0.075], 2.39, 2.43, grp, false, false); });
+      // número do andar em dourado (como o "A" gigante da entrada da torre) e placa de direção dos aptos
+      panel(sign('andar' + andar, 256, 256, function (g) {
+        g.fillStyle = '#E2B444'; g.textAlign = 'center'; g.textBaseline = 'alphabetic';
+        const nw = (g.font = '800 190px ' + FONT, g.measureText(String(andar)).width);
+        g.fillText(String(andar), 120, 196);
+        g.textAlign = 'left'; g.font = '800 64px ' + FONT; g.fillText('º', 120 + nw / 2 + 4, 104); g.textAlign = 'center';
+        g.font = '700 30px ' + FONT; g.fillStyle = '#22318A'; g.fillText('ANDAR', 128, 242);
+      }), -1.17, zb + 0.004, 0.95, 1.0, 1.95, '+z');
+      const esq = [1, 2, 3, 12, 11, 10].map(function (p) { return andar * 100 + p; }), dir = [4, 5, 6, 9, 8, 7].map(function (p) { return andar * 100 + p; });
+      panel(sign('dir' + andar, 320, 140, function (g) {
+        g.fillStyle = '#22318A'; g.fillRect(0, 0, 320, 140);
+        g.fillStyle = '#FFFFFF'; g.font = '600 22px ' + MONO; g.textBaseline = 'middle';
+        g.textAlign = 'left'; g.fillText('← ' + esq.slice(0, 3).join(' '), 18, 36); g.fillText('  ' + esq.slice(3).sort().join(' '), 18, 64);
+        g.textAlign = 'right'; g.fillText(dir.slice(0, 3).join(' ') + ' →', 302, 100); g.fillText(dir.slice(3).sort().join(' ') + '  ', 302, 128);
+        g.fillStyle = '#E2B444'; g.fillRect(18, 82, 284, 2);
+      }), 1.17, zb + 0.006, 1.05, 1.42, 1.88, '+z');
+      // extintor com placa e marcação no piso; abrigo de hidrante
+      const xe = -2.6, ze = -CORR + 0.012;
+      const ext = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.075, 0.5, 20), corrMats.red);
+      ext.position.set(xe, y0 + 1.2, ze + 0.09); grp.add(ext);
+      box(corrMats.dark, [xe - 0.03, ze + 0.06, xe + 0.03, ze + 0.12], 1.45, 1.53, grp, false, false);
+      box(corrMats.dark, [xe - 0.05, ze, xe + 0.05, ze + 0.02], 1.4, 1.5, grp, false, false);
+      panel(sign('ext', 128, 128, function (g) {
+        g.fillStyle = '#C0262D'; g.fillRect(0, 0, 128, 128); g.fillStyle = '#FFFFFF'; g.font = '800 22px ' + FONT; g.textAlign = 'center'; g.fillText('EXTINTOR', 64, 112);
+        g.beginPath(); g.moveTo(64, 14); g.bezierCurveTo(92, 44, 86, 78, 64, 86); g.bezierCurveTo(42, 78, 38, 50, 58, 38); g.bezierCurveTo(58, 52, 66, 56, 70, 50); g.bezierCurveTo(72, 36, 66, 24, 64, 14); g.fill();
+      }), xe, ze + 0.004, 0.22, 1.65, 1.87, '+z');
+      const marca = new THREE.Mesh(new THREE.PlaneGeometry(0.7, 0.7), sign('marca', 64, 64, function (g) {
+        g.fillStyle = '#E2B444'; g.fillRect(0, 0, 64, 64); g.fillStyle = '#C0262D'; g.fillRect(6, 6, 52, 52);
+      }));
+      marca.rotation.x = -Math.PI / 2; marca.position.set(xe, y0 + 0.0135, ze + 0.38); grp.add(marca);
+      box(sign('hidrante', 160, 200, function (g) {
+        g.fillStyle = '#B5202A'; g.fillRect(0, 0, 160, 200); g.fillStyle = 'rgba(255,255,255,.85)'; g.fillRect(16, 16, 128, 100);
+        g.fillStyle = '#B5202A'; g.font = '800 22px ' + FONT; g.textAlign = 'center'; g.fillText('INCÊNDIO', 80, 74);
+        g.fillStyle = '#FFFFFF'; g.font = '700 16px ' + FONT; g.fillText('HIDRANTE', 80, 160); g.fillRect(132, 140, 10, 26);
+      }), [2.25, ze, 2.95, ze + 0.03], 0.75, 1.65, grp, false, false);
+      // ---------- pontas do corredor, com a janelinha basculante da fachada lateral ----------
+      [-1, 1].forEach(function (s) {
+        const xi = s < 0 ? -HL + 0.2 : HL - 0.2;
+        box(corrMats.wall, s < 0 ? [-HL, -1.7, -HL + 0.2, 1.7] : [HL - 0.2, -1.7, HL, 1.7], 0, hgt);
+        box(corrMats.frame, [Math.min(xi, xi - s * 0.04), -0.36, Math.max(xi, xi - s * 0.04), 0.36], 1.06, 1.83, grp, false, false);
+        panel(corrMats.sky, xi - s * 0.045, 0, 0.6, 1.12, 1.77, s < 0 ? '+x' : '-x');
+      });
+      // ---------- piso de porcelanato, rodapés, forro com plafons e a luz deles no chão ----------
+      box(corrMats.floor, [-HL + 0.2, -1.62, HL - 0.2, 1.62], 0, 0.012, grp, false, false);
+      solids.forEach(function (r) {
+        const lx = r[2] - r[0], lz = r[3] - r[1];
+        if (lx >= lz) rodape.push((r[1] + r[3]) / 2 > 0 ? [r[0], r[1] - 0.012, r[2], r[1]] : [r[0], r[3], r[2], r[3] + 0.012]);
+        else if (Math.abs((r[0] + r[2]) / 2) > HL - 1) rodape.push((r[0] + r[2]) / 2 < 0 ? [r[2], r[1], r[2] + 0.012, r[3]] : [r[0] - 0.012, r[1], r[0], r[3]]);
+      });
+      const inst = function (geo, mat, list, place, parent) {
+        const im = new THREE.InstancedMesh(geo, mat, list.length);
+        list.forEach(function (it, i) { place(it); dm.updateMatrix(); im.setMatrixAt(i, dm.matrix); });
+        im.instanceMatrix.needsUpdate = true; (parent || grp).add(im);
+        dm.position.set(0, 0, 0); dm.rotation.set(0, 0, 0); dm.scale.set(1, 1, 1);
+        return im;
+      };
+      const unit = new THREE.BoxGeometry(1, 1, 1);
+      inst(unit, corrMats.skirting, rodape, function (r) { dm.rotation.set(0, 0, 0); dm.position.set((r[0] + r[2]) / 2, y0 + 0.012 + 0.04, (r[1] + r[3]) / 2); dm.scale.set(r[2] - r[0], 0.08, r[3] - r[1]); }).receiveShadow = true;
+      box(corrMats.ceil, [-HL + 0.05, -1.62, HL - 0.05, 1.62], hgt, hgt + 0.08, ceilG, false, true);
+      const xs = []; for (let x = -HL + 1.9; x <= HL - 1.8; x += 3.05) xs.push(x);
+      inst(new THREE.CylinderGeometry(0.17, 0.15, 0.04, 28), corrMats.lamp, xs, function (x) { dm.rotation.set(0, 0, 0); dm.scale.set(1, 1, 1); dm.position.set(x, y0 + hgt - 0.02, 0); }, ceilG);
+      inst(new THREE.PlaneGeometry(2.6, 2.6), corrMats.pool, xs, function (x) { dm.rotation.set(-Math.PI / 2, 0, 0); dm.scale.set(1, 1, 1); dm.position.set(x, y0 + 0.016, 0); }, ceilG).renderOrder = 3;
       tw.corr = { grp: grp, ceil: ceilG, solids: solids, y0: y0 };
     }
 
@@ -885,8 +1049,11 @@
       });
       const lit = !!(apt && sel && apt.door && (apt.view === 'walk' || apt.view === 'free'));
       corrLights.forEach(function (l, i) {
-        l.intensity = lit ? 1.25 : 0;
-        if (lit) { const T = towers[sel.torre].T, dx = apt.door.x > 0 ? -1 : 1; l.position.set(T.x + apt.door.x + dx * (i ? 4.5 : 0.8), sel.andar * FH + 0.28 + CEIL - 0.25, T.z); }
+        l.intensity = lit ? (i === 2 ? 0.9 : 1.1) : 0;
+        if (lit) {
+          const T = towers[sel.torre].T, dx = apt.door.x > 0 ? -1 : 1, x = i === 2 ? 0 : apt.door.x + dx * (i ? -2.6 : 1.2);
+          l.position.set(T.x + Math.max(-HL + 1, Math.min(HL - 1, x)), sel.andar * FH + 0.28 + CEIL - 0.3, T.z);
+        }
       });
       shadowDirty = true; dirty = true;
     }
@@ -935,6 +1102,7 @@
       facadeMats.forEach(function (m) { m.emissiveIntensity = night ? 1.35 : 0.62; });
       M.gold.emissiveIntensity = night ? 0.55 : 0;
       miniMats.on.emissiveIntensity = night ? 0.32 : 0.12;
+      corrMats.sky.color.copy(lin(night ? 0x1B2A52 : 0xDCE9F4));
       if (sel) applySelection();
       lamps.forEach(function (l) { l.intensity = night ? 1.6 : 0; });
       renderer.toneMappingExposure = night ? 1.12 : 1.02;

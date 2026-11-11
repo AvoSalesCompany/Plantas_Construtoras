@@ -12,6 +12,9 @@ window.PLANS['sem-sacada'] = {
   doorTop: 2.10,
   frame: 0.045,
   outline: [[32,48],[584,48],[584,80],[852,80],[852,508],[757,508],[757,728],[32,728]],
+  // face voltada para o corredor do prédio, em px [x0, x1, y]: 'linha' = parede do corredor na frente deste apto (vizinhos);
+  // 'fecha' = recuos do contorno que o corredor fecha quando se visita este apto
+  corredor: { linha: [[32, 852, 728]], fecha: [[757, 852, 728]] },
   walls: [
     { id: 'V1', r: [32, 48, 48, 728] },
     { id: 'H1', r: [48, 48, 567, 66], open: [ { a: 110, b: 237, kind: 'win', win: 'd1' }, { a: 378, b: 506, kind: 'win', win: 'd2' } ] },

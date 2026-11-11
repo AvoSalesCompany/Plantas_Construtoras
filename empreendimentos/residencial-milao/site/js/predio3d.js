@@ -11,7 +11,11 @@
   const FH = 2.84;                 // piso a piso
   const FLOORS = 12;               // andares acima do térreo
   const LEVELS = FLOORS + 1;       // térreo + andares
-  const L = 53.2, D = 15, HL = L / 2, HD = D / 2;
+  // profundidade: apto de canto (7,15 m com o hall de entrada) + corredor + apto de canto; os de meio (6,45 m) deixam o corredor mais largo
+  const L = 53.2, D = 15.6, HL = L / 2, HD = D / 2;
+  const CORR = 1.35;               // meia largura do corredor na frente dos aptos de meio (fachada a 7,8 m, apto de 6,45 m)
+  const FLOOR_UP = 0.3;            // piso acabado dos apartamentos acima da laje do andar
+  const CEIL = 2.5;                // forro dos apartamentos e do corredor (pé-direito da maquete)
   const TOP = LEVELS * FH;         // laje de cobertura
   const CROWN = 1.3, CORE_UP = 3.8, CORE_W = 3.6, CORE_D = 6;
   const PXM = 38;                  // pixels por metro nas texturas de fachada
@@ -31,7 +35,20 @@
     const front = pos <= 6;
     const k = front ? pos : 13 - pos;            // o 7 fica atrás do 6, o 12 atrás do 1
     const x = UNIT_X[k];
-    return { x0: x[0], x1: x[1], z0: front ? 0.8 : -HD, z1: front ? HD : -0.8, front: front, canto: k === 1 || k === 6, k: k };
+    return { x0: x[0], x1: x[1], z0: front ? CORR : -HD, z1: front ? HD : -CORR, front: front, canto: k === 1 || k === 6, k: k };
+  }
+
+  // medidas reais da planta (m) e onde ela fica na torre: centrada na largura do apto e encostada na fachada
+  function planDims(tipo) {
+    const P = window.PLANS && window.PLANS[tipo];
+    if (!P) return null;
+    return { w: (P.extent[0] - P.origin[0]) / P.scale, d: (P.extent[1] - P.origin[1]) / P.scale, P: P };
+  }
+  // da maquete (x, z em metros, centro da planta, fachada para -z) para a torre: gira 180° na frente e espelha dois cantos
+  function unitPlace(pos, tipo) {
+    const r = unitRect(pos), pose = planPose(pos), dm = planDims(tipo) || { w: r.x1 - r.x0, d: r.z1 - r.z0 };
+    const sx = (pose.front ? -1 : 1) * (pose.mirror ? -1 : 1), sz = pose.front ? -1 : 1;
+    return { cx: (r.x0 + r.x1) / 2, cz: pose.front ? HD - dm.d / 2 : -HD + dm.d / 2, w: dm.w, d: dm.d, sx: sx, sz: sz, front: pose.front, mirror: pose.mirror };
   }
 
   // as duas torres ficam em linha, uma ao lado da outra, de frente para a rua (a B um pouco recuada), como nas fotos aéreas
@@ -298,6 +315,7 @@
     const statusOf = opts.statusOf, typeOf = opts.typeOf;
     const colors = opts.colors();
     const reduceMotion = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
+    let dirty = true;                // algo mudou: desenhar de novo (declarado antes de tudo: a planta em cache chama de volta na hora)
 
     const renderer = new THREE.WebGLRenderer({ canvas: cv, antialias: true, powerPreference: 'high-performance' });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
@@ -306,6 +324,8 @@
     renderer.toneMappingExposure = 1.02;
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.shadowMap.autoUpdate = false;          // a sombra é refeita quando a cena é desenhada (e a maquete do apto controla a dela)
+    renderer.localClippingEnabled = true;
     const ANISO = Math.min(8, renderer.capabilities.getMaxAnisotropy());
 
     const scene = new THREE.Scene();
@@ -632,6 +652,8 @@
       return planMats[key];
     }
     let sel = null;            // { torre, andar }
+    let apt = null;            // visita a um apartamento: { pos, view, ceil, door } (a maquete desenha a cena)
+    let shadowDirty = true;
     let filterType = 'todos';
     let hoverUnit = null, selUnit = null;
     const labelEls = [];
@@ -640,7 +662,7 @@
       if (!tw.plate) return;
       tw.root.remove(tw.plate);
       tw.plate.traverse(function (o) { if (o.geometry) o.geometry.dispose(); });
-      tw.plate = null;
+      tw.plate = null; tw.corr = null;
     }
 
     function buildPlate(tw, andar) {
@@ -648,31 +670,134 @@
       const g = new THREE.Group(), y = andar * FH; tw.plate = g; tw.root.add(g);
       const b = function (mat, w, h, d, x, yy, z) { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat); m.position.set(x, yy, z); m.castShadow = true; m.receiveShadow = true; g.add(m); return m; };
       b(plateMats.slab, L, 0.24, D, 0, y + 0.12, 0);
-      b(plateMats.corridor, L - 0.4, 0.04, 1.6, 0, y + 0.26, 0);
+      b(plateMats.corridor, L - 0.4, 0.04, 2 * CORR + 0.3, 0, y + 0.26, 0);
+      const coreD = HD - 0.5 - CORR, faixaD = HD - 0.3 - CORR;
       [-1, 1].forEach(function (s) {
-        b(plateMats.shaft, CORE_W, FH * 0.55, 5.9, 0, y + FH * 0.275, s * 4.05);   // elevadores (frente) e escada (fundos)
-        b(plateMats.shaft, 1.5, FH * 0.45, 6.4, -18.15, y + FH * 0.225, s * 4.1);  // poços de ventilação
-        b(plateMats.shaft, 1.5, FH * 0.45, 6.4, 18.15, y + FH * 0.225, s * 4.1);
+        b(plateMats.shaft, CORE_W, FH * 0.55, coreD, 0, y + FH * 0.275, s * (CORR + coreD / 2));       // elevadores (frente) e escada (fundos)
+        b(plateMats.shaft, 1.5, FH * 0.45, faixaD, -18.15, y + FH * 0.225, s * (CORR + faixaD / 2));   // poços de ventilação
+        b(plateMats.shaft, 1.5, FH * 0.45, faixaD, 18.15, y + FH * 0.225, s * (CORR + faixaD / 2));
       });
       tw.units = [];
       for (let pos = 1; pos <= 12; pos++) {
-        const r = unitRect(pos), st = statusOf(tw.T.id, andar, pos), tp = typeOf(pos), pose = planPose(pos);
+        const st = statusOf(tw.T.id, andar, pos), tp = typeOf(pos), pl = unitPlace(pos, tp);
         const dim = filterType !== 'todos' && tp !== filterType;
-        const w = r.x1 - r.x0 - 0.08, d = r.z1 - r.z0 - 0.08;
-        const ug = new THREE.Group(); ug.position.set((r.x0 + r.x1) / 2, y + 0.3, (r.z0 + r.z1) / 2); g.add(ug);
-        const base = new THREE.Mesh(new THREE.BoxGeometry(w, 0.12, d), unitMat(st, dim)); base.position.y = -0.05; base.receiveShadow = true; ug.add(base);
-        const wrap = new THREE.Group(); if (pose.front) wrap.rotation.y = Math.PI; ug.add(wrap);
-        const inner = new THREE.Group(); if (pose.mirror) inner.scale.x = -1; wrap.add(inner);
+        // a maquete fica no tamanho real da planta, no mesmo lugar onde a visita 3D abre o apartamento
+        const w = pl.w, d = pl.d;
+        const ug = new THREE.Group(); ug.position.set(pl.cx, y + FLOOR_UP, pl.cz); g.add(ug);
+        const wrap = new THREE.Group(); if (pl.front) wrap.rotation.y = Math.PI; ug.add(wrap);
+        const inner = new THREE.Group(); if (pl.mirror) inner.scale.x = -1; wrap.add(inner);
+        // piso na cor da disponibilidade, no contorno da planta (o hall do apto de canto não invade o corredor)
+        const base = new THREE.Mesh(outlineGeo(tp, w, d), unitMat(st, dim)); base.position.y = 0.01; base.receiveShadow = true; inner.add(base);
         const plan = new THREE.Mesh(new THREE.PlaneGeometry(w, d), planMat(tp, st, dim));
         plan.rotation.x = -Math.PI / 2; plan.position.y = 0.016; plan.renderOrder = 2;
         inner.add(plan);
         // maquete do apartamento: paredes e móveis da planta em 3D (acesos se disponível, apagados se reservado ou vendido)
         miniModel(inner, tp, w, d, st === 'livre', dim);
         const info = { unit: pos, torre: tw.T.id, andar: andar, status: st, tipo: tp, dim: dim, baseY: ug.position.y, base: base, plan: plan,
-          front: r.front, half: d / 2 };
+          front: pl.front, half: d / 2 };
         base.userData = info; plan.userData = info; ug.userData = info;
         tw.units.push(ug);
       }
+      if (apt && sel && sel.torre === tw.T.id) buildCorridor(tw, andar, apt.pos);
+    }
+
+    function outlineGeo(tipo, w, d) {
+      const P = window.PLANS && window.PLANS[tipo];
+      if (!P || !P.outline) return new THREE.BoxGeometry(w, 0.12, d).translate(0, -0.06, 0);
+      const S = P.scale, ox = P.origin[0], oy = P.origin[1], sh = new THREE.Shape();
+      P.outline.forEach(function (p, i) { const x = (p[0] - ox) / S - w / 2, z = (p[1] - oy) / S - d / 2; if (i) sh.lineTo(x, z); else sh.moveTo(x, z); });
+      const geo = new THREE.ExtrudeGeometry(sh, { depth: 0.12, bevelEnabled: false });
+      geo.rotateX(Math.PI / 2);                      // deitado: o contorno no plano do chão, 12 cm de espessura para baixo
+      return geo;
+    }
+
+    /* ---------------- corredor do andar (aparece quando se visita um apartamento) ----------------
+       Paredes do corredor pelo contorno de cada apto (o apto de canto tem um hall que avança), portas dos vizinhos com o número,
+       portas dos elevadores e da escada, forro e luzes. Tudo em metros, no sistema da torre. */
+    const corrMats = {
+      wall: std({ color: 0xE9E7E2, roughness: 0.9 }), ceil: std({ color: 0xF3F2EE, roughness: 0.95, emissive: 0xE9E6DF, emissiveIntensity: 0.32 }),
+      door: std({ color: 0xE4DFD6, roughness: 0.6 }), frame: std({ color: 0xBDB8AE, roughness: 0.7 }),
+      steel: std({ color: 0xB9BEC4, roughness: 0.45, metalness: 0.2 }), dark: std({ color: 0x2B2F36, roughness: 0.6 }),   // sem mapa de reflexo: metal pouco metálico para não ficar preto
+      handle: std({ color: 0xC9CDD2, roughness: 0.4, metalness: 0.25 })
+    };
+    const corrLights = [0, 1].map(function () { const l = new THREE.PointLight(0xFFEBD0, 0, 11, 2); scene.add(l); return l; });
+    const numTex = {};
+    function numberTex(n) {
+      if (numTex[n]) return numTex[n];
+      const c = canvas(128, 64), g = c.getContext('2d');
+      g.fillStyle = '#2B2F36'; g.fillRect(0, 0, 128, 64);
+      g.fillStyle = '#E9E7E2'; g.font = '600 38px "IBM Plex Mono", Menlo, monospace'; g.textAlign = 'center'; g.textBaseline = 'middle';
+      g.fillText(String(n), 64, 34);
+      numTex[n] = std({ map: tex(c), roughness: 0.5 });
+      return numTex[n];
+    }
+    // retângulo da maquete (x0, z0, x1, z1 em metros da planta) -> retângulo na torre
+    function toTower(pl, x0, z0, x1, z1) {
+      const ax = pl.cx + pl.sx * x0, bx = pl.cx + pl.sx * x1, az = pl.cz + pl.sz * z0, bz = pl.cz + pl.sz * z1;
+      return [Math.min(ax, bx), Math.min(az, bz), Math.max(ax, bx), Math.max(az, bz)];
+    }
+    // Z: a face do corredor fica 12 mm para fora da parede da planta, para não brigar com as paredes da miniatura do vizinho
+    function corridorPlan(pos) {
+      const tp = typeOf(pos), dm = planDims(tp); if (!dm) return null;
+      const P = dm.P, S = P.scale, ox = P.origin[0], oy = P.origin[1];
+      return { tp: tp, P: P, pl: unitPlace(pos, tp), X: function (px) { return (px - ox) / S - dm.w / 2; }, Z: function (py) { return (py - oy) / S - dm.d / 2 + 0.012; } };
+    }
+    function buildCorridor(tw, andar, own) {
+      const y0 = andar * FH + 0.28, hgt = FLOOR_UP - 0.28 + CEIL, T = 0.12;
+      const grp = new THREE.Group(); grp.visible = false; tw.plate.add(grp);
+      const ceilG = new THREE.Group(); ceilG.visible = false; grp.add(ceilG);
+      const solids = [];                     // retângulos de colisão (na torre)
+      const box = function (mat, r, h0, h1, parent, solid) {
+        if (solid !== false) r = [r[0] - 0.012, r[1], r[2] + 0.012, r[3]];
+        const m = new THREE.Mesh(new THREE.BoxGeometry(Math.max(0.01, r[2] - r[0]), h1 - h0, Math.max(0.01, r[3] - r[1])), mat);
+        m.position.set((r[0] + r[2]) / 2, y0 + (h0 + h1) / 2, (r[1] + r[3]) / 2); m.castShadow = true; m.receiveShadow = true;
+        (parent || grp).add(m);
+        if (solid !== false) solids.push(r);
+        return m;
+      };
+      // paredes dos aptos voltadas para o corredor (o próprio apto vem da maquete; dele só se fecham os recuos do contorno)
+      for (let pos = 1; pos <= 12; pos++) {
+        const cp = corridorPlan(pos); if (!cp || !cp.P.corredor) continue;
+        const segs = pos === own ? (cp.P.corredor.fecha || []) : cp.P.corredor.linha;
+        segs.forEach(function (sg, i) {
+          const zf = cp.Z(sg[2]);
+          box(corrMats.wall, toTower(cp.pl, cp.X(sg[0]), zf - T, cp.X(sg[1]), zf), 0, hgt);
+          const nx = segs[i + 1];
+          if (pos !== own && nx && Math.abs(nx[2] - sg[2]) > 1) {       // degrau entre dois trechos (lateral do hall)
+            const zn = cp.Z(nx[2]), xj = cp.X(nx[0]);
+            box(corrMats.wall, toTower(cp.pl, xj - T / 2, Math.min(zf, zn) - T, xj + T / 2, Math.max(zf, zn)), 0, hgt);
+          }
+        });
+        if (pos === own) continue;
+        // porta de entrada do vizinho, com o número do apto
+        const w = cp.P.walls.find(function (q) { return (q.open || []).some(function (o) { return o.door === 'entrada'; }); });
+        if (!w) continue;
+        const o = w.open.find(function (q) { return q.door === 'entrada'; }), zf = cp.Z(Math.max(w.r[1], w.r[3]));
+        box(corrMats.door, toTower(cp.pl, cp.X(o.a) + 0.04, zf - 0.01, cp.X(o.b) - 0.04, zf + 0.035), 0, 2.08, grp, false);
+        box(corrMats.frame, toTower(cp.pl, cp.X(o.a) - 0.02, zf - 0.005, cp.X(o.a) + 0.04, zf + 0.045), 0, 2.12, grp, false);
+        box(corrMats.frame, toTower(cp.pl, cp.X(o.b) - 0.04, zf - 0.005, cp.X(o.b) + 0.02, zf + 0.045), 0, 2.12, grp, false);
+        box(corrMats.frame, toTower(cp.pl, cp.X(o.a) - 0.02, zf - 0.005, cp.X(o.b) + 0.02, zf + 0.045), 2.08, 2.14, grp, false);
+        const hx = cp.X(cp.P.doors.entrada.hinge === 'a' ? o.b - 18 : o.a + 18);
+        box(corrMats.handle, toTower(cp.pl, hx - 0.07, zf + 0.035, hx + 0.07, zf + 0.06), 1.02, 1.05, grp, false);
+        const nx = cp.X((o.a + o.b) / 2);                                  // número em cima da porta
+        box(numberTex(andar * 100 + pos), toTower(cp.pl, nx - 0.11, zf, nx + 0.11, zf + 0.012), 2.19, 2.3, grp, false);
+      }
+      // poços de ventilação e núcleo (elevadores na frente, escada nos fundos): face reta no corredor
+      [[-18.9, -17.4], [-1.8, 1.8], [17.4, 18.9]].forEach(function (xr) {
+        [-1, 1].forEach(function (s) { box(corrMats.wall, s > 0 ? [xr[0], CORR - 0.012, xr[1], CORR + T] : [xr[0], -CORR - T, xr[1], -CORR + 0.012], 0, hgt); });
+      });
+      [-0.85, 0.85].forEach(function (x) {                                // portas dos elevadores
+        box(corrMats.dark, [x - 0.5, CORR - 0.032, x + 0.5, CORR], 0, 2.2, grp, false);
+        box(corrMats.steel, [x - 0.45, CORR - 0.042, x + 0.45, CORR - 0.005], 0, 2.12, grp, false);
+        box(corrMats.dark, [x - 0.003, CORR - 0.047, x + 0.003, CORR - 0.035], 0, 2.12, grp, false);
+      });
+      box(corrMats.steel, [-0.08, CORR - 0.037, 0.08, CORR], 1.05, 1.3, grp, false);   // botoeira
+      box(corrMats.frame, [-0.52, -CORR, 0.52, -CORR + 0.057], 0, 2.14, grp, false);   // porta da escada
+      box(corrMats.door, [-0.46, -CORR, 0.46, -CORR + 0.062], 0, 2.08, grp, false);
+      box(corrMats.handle, [0.28, -CORR + 0.062, 0.4, -CORR + 0.087], 1.02, 1.05, grp, false);
+      [-1, 1].forEach(function (s) { box(corrMats.wall, s < 0 ? [-HL, -1.7, -HL + 0.2, 1.7] : [HL - 0.2, -1.7, HL, 1.7], 0, hgt); });   // pontas do corredor
+      box(corrMats.ceil, [-HL + 0.05, -1.62, HL - 0.05, 1.62], hgt, hgt + 0.08, ceilG, false);
+      tw.corr = { grp: grp, ceil: ceilG, solids: solids, y0: y0 };
     }
 
     function removeUnitPickables() {
@@ -687,6 +812,7 @@
         el.type = 'button'; el.className = 'u-pill is-' + it.status + (it.dim ? ' is-dim' : '');
         el.textContent = it.num; el.setAttribute('aria-label', 'Apartamento ' + it.num);
         el.addEventListener('click', function () { if (opts.onPickUnit) opts.onPickUnit(it.pos); });
+        el.addEventListener('dblclick', function () { if (opts.onEnterUnit) opts.onEnterUnit(it.pos); });
         labelsEl.appendChild(el);
         labelEls.push({ el: el, p: it.p });
       });
@@ -706,9 +832,6 @@
     function applySelection() {
       TOWERS.forEach(function (T) {
         const tw = towers[T.id], open = sel && sel.torre === T.id ? sel.andar : 0;
-        tw.slices.forEach(function (m, lv) { m.visible = !open || lv < open; });
-        tw.top.visible = !open;
-        tw.balc.forEach(function (im) { im.count = open ? 4 * (open - 1) : 4 * FLOORS; });
         tw.ghost.children.slice().forEach(function (o) { tw.ghost.remove(o); if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); });
         if (open) {
           const h = TOP + CROWN - (open + 1) * FH;
@@ -716,15 +839,16 @@
           gm.position.y = (open + 1) * FH + h / 2; tw.ghost.add(gm);
           const ge = new THREE.LineSegments(new THREE.EdgesGeometry(gm.geometry), new THREE.LineBasicMaterial({ color: lin(colors.navy), transparent: true, opacity: 0.45 }));
           ge.position.copy(gm.position); tw.ghost.add(ge);
-          tw.ghost.visible = true;
           buildPlate(tw, open);
         } else {
-          tw.ghost.visible = false;
           clearPlate(tw); tw.units = null;
         }
       });
+      applyVisibility();
       removeUnitPickables();
-      if (sel) {
+      if (sel && apt) {
+        setLabels([]);
+      } else if (sel) {
         const tw = towers[sel.torre];
         tw.units.forEach(function (ug) { if (!ug.userData.dim) { pickables.push(ug.userData.base); pickables.push(ug.userData.plan); } });
         setLabels(tw.units.map(function (ug) {
@@ -738,8 +862,37 @@
       dirty = true;
     }
 
+    // o que aparece de cada torre: andar aberto (de cima para baixo até ele) ou, na visita a pé, o prédio inteiro menos o andar do apto
+    function applyVisibility() {
+      TOWERS.forEach(function (T) {
+        const tw = towers[T.id], open = sel && sel.torre === T.id ? sel.andar : 0;
+        const inApt = !!(apt && open), full = inApt && apt.view === 'walk';
+        tw.slices.forEach(function (m, lv) { m.visible = !open || lv < open || (full && lv > open); });
+        tw.top.visible = !open || full;
+        tw.balc.forEach(function (im) {
+          if (!im.userData.all) im.userData.all = im.instanceMatrix.array.slice();
+          im.instanceMatrix.array.set(im.userData.all);
+          if (full) im.instanceMatrix.array.fill(0, (open - 1) * 4 * 16, open * 4 * 16);   // a sacada do próprio andar vem da maquete
+          im.instanceMatrix.needsUpdate = true;
+          im.count = open && !full ? 4 * (open - 1) : 4 * FLOORS;
+        });
+        tw.ghost.visible = !!open && !inApt;
+        if (tw.units) tw.units.forEach(function (ug) { ug.visible = !(inApt && ug.userData.unit === apt.pos); });
+        if (tw.corr) {
+          const walking = inApt && (apt.view === 'walk' || apt.view === 'free');
+          tw.corr.grp.visible = walking; tw.corr.ceil.visible = walking && apt.ceil;
+        }
+      });
+      const lit = !!(apt && sel && apt.door && (apt.view === 'walk' || apt.view === 'free'));
+      corrLights.forEach(function (l, i) {
+        l.intensity = lit ? 1.25 : 0;
+        if (lit) { const T = towers[sel.torre].T, dx = apt.door.x > 0 ? -1 : 1; l.position.set(T.x + apt.door.x + dx * (i ? 4.5 : 0.8), sel.andar * FH + 0.28 + CEIL - 0.25, T.z); }
+      });
+      shadowDirty = true; dirty = true;
+    }
+
     function refreshUnitLook() {
-      if (!sel) return;
+      if (!sel || apt) return;
       towers[sel.torre].units.forEach(function (ug) {
         const on = ug.userData.unit === selUnit, hv = ug.userData.unit === hoverUnit;
         ug.position.y = ug.userData.baseY + (on ? 0.7 : hv ? 0.32 : 0);
@@ -756,9 +909,10 @@
       return new THREE.Vector3(target.x + r * Math.sin(phi) * Math.sin(theta), target.y + r * Math.cos(phi), target.z + r * Math.sin(phi) * Math.cos(theta));
     }
     function fitR(r) { const a = camera.aspect; return a < 1.15 ? r * Math.min(2.1, 1.25 / Math.max(a, 0.45)) : r; }
+    const FOV = 30;
     function flyTo(target, pos, ms) {
-      if (reduceMotion || ms === 0) { controls.target.copy(target); camera.position.copy(pos); controls.update(); dirty = true; return; }
-      tween = { t0: performance.now(), ms: ms || 1000, fromT: controls.target.clone(), toT: target.clone(), fromP: camera.position.clone(), toP: pos.clone() };
+      if (reduceMotion || ms === 0) { controls.target.copy(target); camera.position.copy(pos); camera.fov = FOV; camera.updateProjectionMatrix(); controls.update(); dirty = true; return; }
+      tween = { t0: performance.now(), ms: ms || 1000, fromT: controls.target.clone(), toT: target.clone(), fromP: camera.position.clone(), toP: pos.clone(), fromF: camera.fov };
     }
     function currentTheta() { const v = camera.position.clone().sub(controls.target); return Math.atan2(v.x, v.z); }
     function goHome(ms) { flyTo(HOME.target, spherical(HOME.target, fitR(HOME.r), HOME.phi, HOME.theta), ms); }
@@ -789,7 +943,7 @@
 
     /* ---------------- interação ---------------- */
     const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
-    let hoverFloor = null, down = null, dirty = true, interacted = false;
+    let hoverFloor = null, down = null, interacted = false;
     function pick(cx, cy) {
       const r = cv.getBoundingClientRect();
       ndc.set(((cx - r.left) / r.width) * 2 - 1, -((cy - r.top) / r.height) * 2 + 1);
@@ -806,7 +960,7 @@
       dirty = true;
     }
     cv.addEventListener('pointermove', function (ev) {
-      if (ev.pointerType === 'touch' || down && down.moved) return;
+      if (apt || ev.pointerType === 'touch' || down && down.moved) return;
       const u = pick(ev.clientX, ev.clientY);
       if (u && u.unit) {
         setHoverFloor(null);
@@ -820,8 +974,9 @@
         if (opts.onHover) opts.onHover(hoverFloor, ev.clientX, ev.clientY);
       }
     });
-    cv.addEventListener('pointerleave', function () { setHoverFloor(null); if (hoverUnit) { hoverUnit = null; refreshUnitLook(); } if (opts.onHover) opts.onHover(null); });
-    cv.addEventListener('pointerdown', function (ev) { down = { x: ev.clientX, y: ev.clientY, t: performance.now(), moved: false }; });
+    cv.addEventListener('pointerleave', function () { if (apt) return; setHoverFloor(null); if (hoverUnit) { hoverUnit = null; refreshUnitLook(); } if (opts.onHover) opts.onHover(null); });
+    let lastTap = null;
+    cv.addEventListener('pointerdown', function (ev) { if (apt) { down = null; return; } down = { x: ev.clientX, y: ev.clientY, t: performance.now(), moved: false }; });
     cv.addEventListener('pointerup', function (ev) {
       if (!down) return;
       const moved = Math.hypot(ev.clientX - down.x, ev.clientY - down.y) > 7, quick = performance.now() - down.t < 600;
@@ -829,8 +984,12 @@
       if (moved || !quick) return;
       const u = pick(ev.clientX, ev.clientY);
       if (!u) return;
-      if (u.unit) { if (opts.onPickUnit) opts.onPickUnit(u.unit); }
-      else if (opts.onPickFloor) opts.onPickFloor(u.torre, u.andar);
+      if (u.unit) {
+        const t = performance.now();
+        if (lastTap && lastTap.unit === u.unit && t - lastTap.t < 480) { lastTap = null; if (opts.onEnterUnit) opts.onEnterUnit(u.unit); return; }
+        lastTap = { unit: u.unit, t: t };
+        if (opts.onPickUnit) opts.onPickUnit(u.unit);
+      } else if (opts.onPickFloor) opts.onPickFloor(u.torre, u.andar);
     });
     cv.addEventListener('pointermove', function (ev) { if (down && Math.hypot(ev.clientX - down.x, ev.clientY - down.y) > 7) down.moved = true; });
     controls.addEventListener('start', function () { interacted = true; controls.autoRotate = false; tween = null; });
@@ -855,6 +1014,7 @@
         const k = Math.min(1, (now - tween.t0) / tween.ms), e = easeInOut(k);
         controls.target.lerpVectors(tween.fromT, tween.toT, e);
         camera.position.lerpVectors(tween.fromP, tween.toP, e);
+        if (tween.fromF !== FOV) { camera.fov = tween.fromF + (FOV - tween.fromF) * e; camera.updateProjectionMatrix(); }
         if (k >= 1) tween = null;
         dirty = true;
       }
@@ -862,6 +1022,9 @@
       if (controls.autoRotate) dirty = true;
       if (!dirty && !moving) return;
       dirty = false;
+      renderer.autoClear = true;
+      renderer.toneMappingExposure = night ? 1.12 : 1.02;
+      renderer.shadowMap.needsUpdate = true;
       renderer.render(scene, camera);
       placeLabels();
     }
@@ -912,9 +1075,97 @@
       },
       setPaused: function (p) { paused = !!p; dirty = true; },
       interacted: function () { return interacted; },
+
+      /* ---------- visita ao apartamento no lugar dele ----------
+         enterUnit: a maquete completa passa a ocupar o lugar da miniatura e desenha a cena (prédio + apto) com a câmera dela;
+         o prédio para o próprio laço e devolve onde o apto fica (matriz da maquete para o mundo), o sol, o corredor e a câmera atual. */
+      enterUnit: function (pos) {
+        if (!sel || apt) return null;
+        const tw = towers[sel.torre], cp = corridorPlan(pos);
+        apt = { pos: pos, view: '3d', ceil: false, door: null };
+        if (cp) {
+          const w = cp.P.walls.find(function (q) { return (q.open || []).some(function (o) { return o.door === 'entrada'; }); });
+          if (w) {
+            const o = w.open.find(function (q) { return q.door === 'entrada'; }), zf = cp.Z(Math.max(w.r[1], w.r[3])), x = cp.X((o.a + o.b) / 2);
+            apt.door = { x: cp.pl.cx + cp.pl.sx * x, z: cp.pl.cz + cp.pl.sz * zf };
+          }
+        }
+        selUnit = pos; hoverUnit = null; lastTap = null; setHoverFloor(null);
+        controls.autoRotate = false; controls.enabled = false; tween = null; paused = true;
+        applySelection();
+        const T = tw.T, tp = typeOf(pos), pl = unitPlace(pos, tp), fy = sel.andar * FH + FLOOR_UP;
+        const m = new THREE.Matrix4().makeScale(pl.sx, 1, pl.sz).setPosition(T.x + pl.cx, fy, T.z + pl.cz);
+        const sunDir = sun.position.clone().sub(sun.target.position).normalize();
+        const solids = tw.corr ? tw.corr.solids : [];
+        const out = {
+          tipo: tp, torre: T.id, andar: sel.andar, pos: pos, mirror: pl.mirror, night: night,
+          matrix: m.toArray(), floorY: fy, sunDir: sunDir.toArray(),
+          walls: solids.map(function (r) { return [r[0] + T.x, r[1] + T.z, r[2] + T.x, r[3] + T.z]; }),
+          walk: [T.x - HL + 0.2, T.z - 1.62, T.x + HL - 0.2, T.z + 1.62],
+          camera: { pos: camera.position.toArray(), target: controls.target.toArray(), fov: camera.fov }
+        };
+        if (apt.door) {                                            // vista do corredor: no corredor, olhando de lado para a porta do apto
+          const dx = apt.door.x > 0 ? -1 : 1, sg = apt.door.z > 0 ? 1 : -1, eye = sel.andar * FH + 0.28 + 1.6;
+          const alvo = { x: apt.door.x, z: apt.door.z - sg * 0.1 };
+          // segmento livre até a porta? (os halls dos aptos de canto podem tapar a vista; as paredes do próprio apto também contam)
+          const vistos = solids.slice();
+          if (cp && cp.P.corredor) cp.P.corredor.linha.forEach(function (q, i, all) {
+            const zf = cp.Z(q[2]); vistos.push(toTower(cp.pl, cp.X(q[0]), zf - 0.12, cp.X(q[1]), zf));
+            const nx = all[i + 1];
+            if (nx && Math.abs(nx[2] - q[2]) > 1) { const xj = cp.X(nx[0]), zn = cp.Z(nx[2]); vistos.push(toTower(cp.pl, xj - 0.06, Math.min(zf, zn) - 0.12, xj + 0.06, Math.max(zf, zn))); }
+          });
+          const livre = function (ax, az) {
+            return !vistos.some(function (r) {
+              if (ax > r[0] - 0.3 && ax < r[2] + 0.3 && az > r[1] - 0.3 && az < r[3] + 0.3) return true;
+              let t0 = 0, t1 = 1; const ddx = alvo.x - ax, ddz = alvo.z - az;
+              const clip = function (p, q) { if (Math.abs(p) < 1e-9) return q >= 0; const t = q / p; if (p < 0) { if (t > t1) return false; if (t > t0) t0 = t; } else { if (t < t0) return false; if (t < t1) t1 = t; } return true; };
+              return clip(-ddx, ax - r[0]) && clip(ddx, r[2] - ax) && clip(-ddz, az - r[1]) && clip(ddz, r[3] - az) && t0 < t1;
+            });
+          };
+          let at = null;
+          [1.7, 1.3, 2.3, 3].some(function (d) {
+            return [0, -sg * 0.3].some(function (zc) { const x = apt.door.x + dx * d; if (Math.abs(x) < HL - 0.5 && livre(x, zc)) { at = [x, zc]; return true; } return false; });
+          });
+          let to = [T.x + apt.door.x, eye - 0.35, T.z + apt.door.z];
+          if (!at) {                                               // porta no fundo do corredor (apto de canto): na frente dela, olhando o corredor
+            at = [apt.door.x, apt.door.z - sg * 0.95];
+            to = [T.x + apt.door.x + dx * 8, eye - 0.15, T.z];
+          }
+          out.corridor = { name: 'Corredor do ' + sel.andar + 'º andar', at: [T.x + at[0], eye, T.z + at[1]], to: to };
+        }
+        return out;
+      },
+      // vista atual da maquete: 3d, top, walk ou free; ceil = forro da maquete visível (o do corredor acompanha)
+      setAptView: function (view, ceil) {
+        if (!apt) return;
+        if (apt.view === view && apt.ceil === !!ceil) return;
+        apt.view = view; apt.ceil = !!ceil;
+        applyVisibility();
+      },
+      // desenha o prédio com a câmera da maquete (a maquete desenha o apto por cima, no mesmo quadro)
+      renderWith: function (cam) {
+        renderer.autoClear = true;
+        renderer.toneMappingExposure = night ? 1.12 : 1.02;
+        renderer.shadowMap.needsUpdate = shadowDirty; shadowDirty = false;
+        renderer.render(scene, cam);
+      },
+      // sai da visita: a câmera do prédio começa onde a da maquete estava e volta voando para o andar
+      exitUnit: function (cam) {
+        if (!apt) return;
+        apt = null;
+        if (cam) {
+          camera.position.fromArray(cam.pos); controls.target.fromArray(cam.target);
+          camera.fov = cam.fov || FOV; camera.updateProjectionMatrix(); camera.lookAt(controls.target);
+        }
+        controls.enabled = true; paused = false;
+        applySelection(); refreshUnitLook();
+        if (sel) goFloor(sel.torre, sel.andar, reduceMotion ? 0 : 1300);
+        dirty = true;
+      },
+      renderer: renderer, canvas: cv,
       FH: FH, unitRect: unitRect, L: L, D: D
     };
   }
 
-  window.Predio3D = { create: create, unitRect: unitRect, planCanvas: planCanvas, planPose: planPose, BAYS: BAYS, FH: FH, L: L, D: D };
+  window.Predio3D = { create: create, unitRect: unitRect, unitPlace: unitPlace, planCanvas: planCanvas, planPose: planPose, BAYS: BAYS, FH: FH, L: L, D: D, HD: HD, CORR: CORR };
 })();

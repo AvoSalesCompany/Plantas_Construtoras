@@ -55,20 +55,31 @@
             <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 7.5 8 3l5.5 4.5M4 6.5V13h3V9.5h2V13h3V6.5"/></svg>Ver as duas torres
           </button>
         </div>
-        <p class="stage-hint" id="stageHint">Arraste para girar · role ou faça pinça para aproximar · toque num andar</p>
+        <p class="stage-hint" id="stageHint">Arraste para girar · role ou faça pinça para aproximar · toque num andar · dois cliques num apê para entrar</p>
         <div class="tip" id="tip" hidden></div>
         <div class="loading" id="loading"><span>Montando as torres…</span></div>
-        <div class="apt-layer" id="aptLayer" hidden>
-          <iframe id="aptFrame" title="Apartamento em 3D" allow="fullscreen"></iframe>
-          <div class="curtain" id="curtain" aria-live="polite">
-            <div class="curtain-in">
-              <p class="eyebrow" id="curtainSub">Torre A · 8º andar</p>
-              <p class="curtain-title" id="curtainTitle">Apto 803</p>
-              <span class="curtain-bar" aria-hidden="true"></span>
-              <p class="curtain-msg" id="curtainMsg">Entrando no apartamento…</p>
+        <!-- visita ao apartamento: a maquete abre no lugar do apto, na mesma cena; aqui ficam só os controles por cima -->
+        <div class="apt-hud" id="aptHud" hidden>
+          <div class="apt-labels" id="aptLabels"></div>
+          <div class="apt-cross" id="aptCross" hidden></div>
+          <div class="apt-visit" id="aptVisit" hidden>
+            <p><small id="aptMode">Visitando</small><strong id="aptRoom">Circulação</strong></p>
+            <div class="apt-visit-btns">
+              <button class="btn btn-gold btn-sm" id="aptStand" type="button" hidden>Levantar</button>
+              <button class="btn btn-ink btn-sm" id="aptExitVisit" type="button">Sair da visita</button>
             </div>
           </div>
+          <p class="apt-hint" id="aptHint"></p>
+          <div class="apt-touch" id="aptTouch" hidden>
+            <div class="apt-joy" id="aptJoy" role="img" aria-label="Joystick: arraste para andar"><div class="apt-knob" id="aptKnob"></div></div>
+            <div class="apt-updown" id="aptUpdown">
+              <button type="button" id="aptUp" aria-label="Subir"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg></button>
+              <button type="button" id="aptDown" aria-label="Descer"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+            </div>
+          </div>
+          <div class="apt-tip" id="aptTip" hidden></div>
         </div>
+        <p class="apt-entering" id="aptEntering" hidden aria-live="polite"><span id="aptEnteringTxt">Entrando no apartamento…</span></p>
         <div class="stage-error" id="stageError" hidden>
           <strong>O 3D não abriu neste navegador.</strong>
           Ele precisa de WebGL. Você ainda pode escolher o andar e o apartamento pelo painel ao lado.
@@ -97,7 +108,7 @@
         <li><i class="dot is-reservado"></i>Reservado</li>
         <li><i class="dot is-vendido"></i>Vendido</li>
       </ul>
-      <p class="legend-note"><span class="win is-on" aria-hidden="true"></span>No prédio, janela acesa é apartamento disponível. Ao abrir um andar, cada apê aparece em 3D: aceso se está disponível, apagado se está reservado ou vendido.</p>
+      <p class="legend-note"><span class="win is-on" aria-hidden="true"></span>No prédio, janela acesa é apartamento disponível. Ao abrir um andar, cada apê aparece em 3D: aceso se está disponível, apagado se está reservado ou vendido. Dois cliques num apê entram nele.</p>
 
       <!-- lista de andares -->
       <div class="view" id="viewAndares">
@@ -121,7 +132,7 @@
         </div>
       </div>
 
-      <!-- visita ao apartamento (a maquete fica no palco ao lado) -->
+      <!-- visita ao apartamento (a maquete abre no palco, no lugar dela no bloco) -->
       <div class="view" id="viewApto" hidden>
         <div class="floor-head">
           <button class="back" id="btnSairApto" type="button">
@@ -145,7 +156,7 @@
         </div>
         <p class="panel-title">Cômodos · <span id="aptoTotal">—</span></p>
         <ul class="room-list" id="aptoComodos"><li class="unit-empty">Carregando os cômodos…</li></ul>
-        <p class="unit-note" id="aptoDica">Toque num cômodo para entrar nele. Na visita, clique nas portas, luzes e interruptores, janelas e persianas, TVs, torneiras, chuveiro, fogão, privada, camas e sofá.</p>
+        <p class="unit-note" id="aptoDica">Toque num cômodo para entrar nele. A porta de entrada dá para o corredor do andar.</p>
         <div class="unit-actions">
           <button class="btn btn-line" id="btnTelaCheia" type="button">Tela cheia</button>
           <button class="btn btn-gold" id="btnInteresseApto" type="button">Tenho interesse</button>
@@ -254,6 +265,9 @@
 <script src="js/dados.js"></script>
 <script src="apartamento/planta-sem-sacada.js"></script>
 <script src="apartamento/planta-com-sacada.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/objects/Reflector.js"></script>
+<script>window.APT_NO_AUTOSTART = true;</script>
+<script src="apartamento/app.js"></script>
 <script src="js/predio3d.js"></script>
 <script src="js/app.js"></script>
 </body>

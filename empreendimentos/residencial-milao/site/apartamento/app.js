@@ -31,38 +31,61 @@
     return out;
   };
 
-  // planta escolhida pelo endereço (#tipo=com-sacada); sem parâmetro, a planta sem sacada
-  var TIPO = /(?:^|[#&])tipo=com-sacada(?:&|$)/.test(location.hash) ? 'com-sacada' : 'sem-sacada';
-  window.PLAN = window.PLANS && window.PLANS[TIPO];
-  var errBox = document.getElementById('err');
-  var loadingEl = document.getElementById('loading');
-  function fail(e) {
-    console.error(e);
-    if (loadingEl) loadingEl.hidden = true;
-    if (errBox) errBox.hidden = false;
-    try { if (window.parent && window.parent !== window) window.parent.postMessage({ type: 'apt:error' }, '*'); } catch (e2) { /* sem site em volta */ }
+  function hashQuery() {
+    const q = {};
+    try { (location.hash || '').replace(/^#/, '').split('&').forEach(function (kv) { const p = kv.split('='); if (p[0]) q[decodeURIComponent(p[0])] = decodeURIComponent(p[1] || ''); }); } catch (e) { /* sem parâmetros */ }
+    return q;
   }
-  if (window.__aptLibFail || !window.THREE || !window.THREE.OrbitControls || !window.PLAN) { fail(new Error('Biblioteca 3D indisponível')); return; }
-  try { main(); } catch (e) { fail(e); }
+  /* AptEngine.create(opts) monta a maquete.
+     Página avulsa: lê o endereço (#tipo=com-sacada&andar=8&apto=801&torre=A) e desenha sozinha.
+     Dentro do site do prédio (opts.integrated): usa o renderizador e o canvas do prédio, fica no lugar do apto no bloco
+     (opts.integrated.matrix leva da maquete para o mundo), desenha o prédio junto com a mesma câmera, deixa sair pelo corredor
+     e devolve dispose() para sair do apto. */
+  function create(opts) {
+    opts = opts || {};
+    const P = window.PLANS && window.PLANS[opts.tipo === 'com-sacada' ? 'com-sacada' : 'sem-sacada'];
+    if (!window.THREE || !window.THREE.OrbitControls || !P) throw new Error('Biblioteca 3D indisponível');
+    window.PLAN = P;
+    return main(P, opts);
+  }
+  window.AptEngine = { create: create };
 
-  function main() {
-    const P = window.PLAN;
+  if (document.getElementById('c') && !window.APT_NO_AUTOSTART) {
+    const q = hashQuery();
+    const errBox = document.getElementById('err'), loadingEl = document.getElementById('loading');
+    const fail = function (e) {
+      console.error(e);
+      if (loadingEl) loadingEl.hidden = true;
+      if (errBox) errBox.hidden = false;
+      try { if (window.parent && window.parent !== window) window.parent.postMessage({ type: 'apt:error' }, '*'); } catch (e2) { /* sem site em volta */ }
+    };
+    if (window.__aptLibFail) fail(new Error('Biblioteca 3D indisponível'));
+    else {
+      try {
+        window.__apt = create({
+          tipo: q.tipo, andar: q.andar, apto: q.apto, torre: q.torre, embed: q.embed === '1',
+          onReady: function () {
+            if (errBox) errBox.hidden = true;
+            if (loadingEl) { loadingEl.classList.add('done'); setTimeout(function () { loadingEl.hidden = true; }, 500); }
+          }
+        });
+      } catch (e) { fail(e); }
+    }
+  }
+
+  function main(P, opts) {
+    const INTEG = opts.integrated || null;
     const S = P.scale, OX = P.origin[0], OY = P.origin[1];
     const mx = (p) => (p - OX) / S;
     const mz = (p) => (p - OY) / S;
     const W = mx(P.extent[0]), D = mz(P.extent[1]), CX = W / 2, CZ = D / 2;
     const wx = (p) => mx(p) - CX, wz = (p) => mz(p) - CZ;
     const H_HIGH = P.H, H_LOW = 0.9, EYE = 1.6, RADIUS = 0.22, DEG = Math.PI / 180;
-    // andar vindo do site do prédio (#andar=8&apto=803&torre=A); sem parâmetro, 5º andar como antes
-    const APT_Q = (function () {
-      const q = {};
-      try { (location.hash || '').replace(/^#/, '').split('&').forEach(function (kv) { const p = kv.split('='); if (p[0]) q[decodeURIComponent(p[0])] = decodeURIComponent(p[1] || ''); }); } catch (e) { /* sem parâmetros */ }
-      return q;
-    })();
+    const APT_Q = { andar: opts.andar, apto: opts.apto, torre: opts.torre };
     const APT_FLOOR = Math.max(1, Math.min(12, parseInt(APT_Q.andar, 10) || 5));
-    const GROUND_Y = -2.84 * APT_FLOOR;                       // piso do apartamento: andar x 2,84 m acima do térreo
-    const EMBED = APT_Q.embed === '1';                        // aberto dentro do site do prédio: o painel do site controla a visita
-    (function () {
+    const GROUND_Y = INTEG ? -INTEG.floorY : -2.84 * APT_FLOOR;   // piso do apartamento: andar x 2,84 m acima do térreo
+    const EMBED = !!opts.embed;                                // aberto num iframe: o site em volta controla a visita por mensagens
+    if (!INTEG) (function () {
       const eb = document.querySelector('.title .eyebrow');
       if (eb && APT_Q.apto) eb.textContent = 'Residencial Milão · Apto ' + APT_Q.apto + (APT_Q.torre ? ' · Torre ' + APT_Q.torre : '') + ' · ' + APT_FLOOR + 'º andar';
       const h1 = document.querySelector('.title h1'); if (h1) h1.textContent = P.meta.titulo;
@@ -75,37 +98,54 @@
     })();
     const SUN_EL = 42 * DEG, SUN_AZ = 25 * DEG;               // sol ao norte-nordeste (hemisfério sul): entra pelas janelas do norte
     const SUN_DIR = new THREE.Vector3(Math.sin(SUN_AZ) * Math.cos(SUN_EL), Math.sin(SUN_EL), -Math.cos(SUN_AZ) * Math.cos(SUN_EL)).normalize();
+    // no prédio: matriz da maquete para o mundo (gira 180° nos aptos da frente, espelha dois cantos) e o sol do prédio
+    const U = INTEG ? new THREE.Matrix4().fromArray(INTEG.matrix) : null;
+    const UINV = U ? U.clone().invert() : null;
+    const MX = INTEG && INTEG.mirror ? -1 : 1;                 // apto espelhado: direita na tela é esquerda na maquete
+    if (INTEG && INTEG.sunDir) SUN_DIR.fromArray(INTEG.sunDir).transformDirection(UINV);
     const SHUT = { fw: 0.045, pitch: 0.047, up: 2 * 0.047 };  // persiana: moldura, passo das lâminas, lâminas visíveis quando recolhida
-    const PLAN_IMG = P.meta.img;                               // planta oficial (sobreposição)
+    const PLAN_IMG = (opts.base || '') + P.meta.img;                               // planta oficial (sobreposição)
     const dbg = window.__DEBUG ? (window.__debug = { boxes: [], circles: [], doors: [] }) : null;
     const mm = (q) => !!(window.matchMedia && matchMedia(q).matches);
     const coarse = mm('(pointer: coarse)');
     const reduceMotion = mm('(prefers-reduced-motion: reduce)');
     const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
-    const $ = (id) => document.getElementById(id);
+    const dummies = {};
+    const $ = function (id) {                                  // no prédio, o que o painel do site já faz vira elemento solto (não aparece)
+      if (opts.dom && opts.dom[id]) return opts.dom[id];
+      if (!INTEG) return document.getElementById(id);
+      if (!dummies[id]) dummies[id] = document.createElement(id === 'rooms' ? 'details' : id === 'roomList' ? 'ul' : /^[vt][A-Z0-9]/.test(id) ? 'button' : 'div');
+      return dummies[id];
+    };
+    const offs = [];                                            // ouvintes registrados: dispose() solta todos
+    function on(t, type, fn, o) { if (!t || !t.addEventListener) return; t.addEventListener(type, fn, o); offs.push(function () { t.removeEventListener(type, fn, o); }); }
 
     /* ---------------- renderizador, cena, câmera ---------------- */
     const stage = $('stage');
-    const canvas = $('c');
-    const renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, powerPreference: 'high-performance' });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
+    const canvas = INTEG ? opts.canvas : $('c');
+    const renderer = INTEG ? opts.renderer : new THREE.WebGLRenderer({ canvas: canvas, antialias: true, powerPreference: 'high-performance' });
+    if (!INTEG) {
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
+      renderer.outputEncoding = THREE.sRGBEncoding;
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 1.0;
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    }
     renderer.localClippingEnabled = true;
-    renderer.outputEncoding = THREE.sRGBEncoding;
-    renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.0;
-    renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.shadowMap.autoUpdate = false;
     renderer.shadowMap.needsUpdate = true;
     let needsRender = true;
     const markDirty = () => { needsRender = true; };
     const dirtyShadows = () => { renderer.shadowMap.needsUpdate = true; needsRender = true; };
     const maxAniso = renderer.capabilities.getMaxAnisotropy();
-    canvas.addEventListener('webglcontextlost', function (e) { e.preventDefault(); }, false);
-    canvas.addEventListener('webglcontextrestored', function () { dirtyShadows(); }, false);
+    on(canvas, 'webglcontextlost', function (e) { e.preventDefault(); }, false);
+    on(canvas, 'webglcontextrestored', function () { dirtyShadows(); }, false);
 
     const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(36, 1, 0.15, 3000);
+    if (U) { scene.matrixAutoUpdate = false; scene.matrix.copy(U); }   // a maquete inteira vai para o lugar do apto no bloco
+    const camera = new THREE.PerspectiveCamera(36, 1, 0.15, 3000);    // câmera da maquete (coordenadas da planta)
+    const camW = INTEG ? new THREE.PerspectiveCamera(36, 1, 0.15, 3000) : null;   // a mesma câmera no mundo do prédio
     const root = new THREE.Group();
     root.position.set(-CX, 0, -CZ);
     scene.add(root);
@@ -126,6 +166,7 @@
 
     const hemi = new THREE.HemisphereLight(0xeaf2ff, 0xb8ab96, 0.46);
     scene.add(hemi);
+    if (U) hemi.updateMatrixWorld = function () { this.matrixWorld.makeTranslation(0, 1, 0); };   // o céu continua em cima, onde quer que o apto esteja
     scene.add(new THREE.AmbientLight(0xffffff, 0.1));
     const sun = new THREE.DirectionalLight(0xfff1dc, 1.5);
     sun.target.position.set(0, 1.2, 0);
@@ -465,6 +506,7 @@
        A luz rebatida (ambiente) de cada cômodo segue o quanto entra de luz: janela/persiana aberta, porta, luz acesa. */
     const APT_U = {
       aptRects: { value: new Float32Array(40) },
+      aptToLocal: { value: UINV ? UINV.clone() : new THREE.Matrix4() },
       aptZoneFill: { value: new THREE.Vector4(1, 1, 1, 1) },
       aptPZone: { value: new Float32Array(4) },
       aptSZone: { value: new Float32Array(4) }
@@ -518,11 +560,12 @@
       const zoned = aptLevel >= 2 && !!aptChunk;
       shader.uniforms.aptRects = APT_U.aptRects;
       shader.uniforms.aptZoneFill = APT_U.aptZoneFill;
+      shader.uniforms.aptToLocal = APT_U.aptToLocal;
       if (zoned) { shader.uniforms.aptPZone = APT_U.aptPZone; shader.uniforms.aptSZone = APT_U.aptSZone; }
       shader.vertexShader = vs
-        .replace('#include <common>', function () { return '#include <common>\nvarying vec3 vAptWorld;'; })
+        .replace('#include <common>', function () { return '#include <common>\nvarying vec3 vAptWorld;\nuniform mat4 aptToLocal;'; })
         .replace('#include <worldpos_vertex>', function () {
-          return '#include <worldpos_vertex>\n\tvec4 aptWP = vec4( transformed, 1.0 );\n\t#ifdef USE_INSTANCING\n\taptWP = instanceMatrix * aptWP;\n\t#endif\n\tvAptWorld = ( modelMatrix * aptWP ).xyz;';
+          return '#include <worldpos_vertex>\n\tvec4 aptWP = vec4( transformed, 1.0 );\n\t#ifdef USE_INSTANCING\n\taptWP = instanceMatrix * aptWP;\n\t#endif\n\tvAptWorld = ( aptToLocal * modelMatrix * aptWP ).xyz;';
         });
       shader.fragmentShader = fs
         .replace('#include <common>', function () { return '#include <common>\n' + APT_FRAG + (zoned ? '\n' + APT_FRAG_LIGHTS : ''); })
@@ -824,7 +867,8 @@
     const sunSprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texSun, blending: THREE.AdditiveBlending, depthWrite: false, fog: false, toneMapped: false, transparent: true }));
     sunSprite.scale.set(240, 240, 1); sunSprite.renderOrder = -9; sunSprite.frustumCulled = false; scene.add(sunSprite);
     scene.fog = new THREE.Fog(0xd3e2ec, 170, 1350);
-    renderer.setClearColor(0xd3e2ec, 1);
+    if (INTEG) { sky.visible = false; sunSprite.visible = false; scene.fog = null; }   // no prédio, o céu e o chão são os do prédio
+    else renderer.setClearColor(0xd3e2ec, 1);
     const landGroup = new THREE.Group(); scene.add(landGroup);
     const landInfo = { houses: 0, trees: 0, towers: 0, cars: 0 };
     function buildLandscape() {
@@ -1183,7 +1227,7 @@
         mesh(hillGeo, hillMat, Math.cos(a) * d, G - sy * 0.3, Math.sin(a) * d, 190 + R() * 220, sy, 130 + R() * 150, a);
       }
     }
-    try { buildLandscape(); } catch (e) { console.error('paisagem', e); }
+    if (!INTEG) { try { buildLandscape(); } catch (e) { console.error('paisagem', e); } }
 
 
     P.floors.forEach(function (f) {
@@ -2370,10 +2414,38 @@
       });
     })();
 
+    /* ---------------- corredor do andar (no prédio) ----------------
+       As paredes do corredor viram colisão e o visitante pode andar por ele; o corredor conta como um cômodo a mais. */
+    const WALK = [[-CX, -CZ, CX, CZ]];
+    let CORR_ROOM = null;
+    if (INTEG) {
+      const rectL = function (r) {
+        const a = new THREE.Vector3(r[0], 0, r[1]).applyMatrix4(UINV), b = new THREE.Vector3(r[2], 0, r[3]).applyMatrix4(UINV);
+        return [Math.min(a.x, b.x), Math.min(a.z, b.z), Math.max(a.x, b.x), Math.max(a.z, b.z)];
+      };
+      (INTEG.walls || []).forEach(function (r) { const q = rectL(r); staticBoxes.push({ x0: q[0], x1: q[2], z0: q[1], z1: q[3], k: 'arch' }); });
+      if (INTEG.walk) WALK.push(rectL(INTEG.walk));
+      if (INTEG.corridor) {
+        CORR_ROOM = { id: 'corredor', name: INTEG.corridor.name || 'Corredor', area: '', dims: '', rects: [], walk: WALK[1] || null,
+          viewL: { at: new THREE.Vector3().fromArray(INTEG.corridor.at).applyMatrix4(UINV), to: new THREE.Vector3().fromArray(INTEG.corridor.to).applyMatrix4(UINV) } };
+      }
+    }
+    // rede de segurança: o centro do visitante fica dentro do apto ou do corredor (as paredes já seguram o corpo dele)
+    function clampWalk(p, r) {
+      if (WALK.length === 1) { p.x = clamp(p.x, -CX + r, CX - r); p.z = clamp(p.z, -CZ + r, CZ - r); return; }
+      let bx = p.x, bz = p.z, bd = Infinity;
+      for (let i = 0; i < WALK.length; i++) {
+        const q = WALK[i], x = clamp(p.x, q[0], q[2]), z = clamp(p.z, q[1], q[3]), d = (x - p.x) * (x - p.x) + (z - p.z) * (z - p.z);
+        if (d < bd) { bd = d; bx = x; bz = z; }
+      }
+      p.x = bx; p.z = bz;
+    }
+
     /* ---------------- luz do dia: claridade que entra por cada janela e feixes de sol nas janelas ao norte ---------------- */
     const RAY = new THREE.Vector3(-SUN_DIR.x, -SUN_DIR.y, -SUN_DIR.z);
     const SHAFT_ROOM = P.shaftRooms;
     const DAY_SPOT = 0.85;
+    let dayK = 1;                    // 1 de dia; 0 à noite (site no tema escuro): a janela não traz luz e as luzes ficam acesas
     const shaftGroup = new THREE.Group(); root.add(shaftGroup);
     const daylight = [];
     function shutterBottomOf(id, p) {
@@ -2413,6 +2485,7 @@
         geo.setIndex(idx);
         const planes = [new THREE.Plane(new THREE.Vector3(1, 0, 0), -wx(rr[0])), new THREE.Plane(new THREE.Vector3(-1, 0, 0), wx(rr[2])),
           new THREE.Plane(new THREE.Vector3(0, 0, 1), -wz(rr[1]) + 0.02), new THREE.Plane(new THREE.Vector3(0, 0, -1), wz(rr[3]))];
+        if (U) planes.forEach(function (pl) { pl.applyMatrix4(U); });
         const mat = new THREE.MeshBasicMaterial({ map: texBeam, color: 0xfff0d2, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false, clippingPlanes: planes });
         const mesh = new THREE.Mesh(geo, mat); mesh.frustumCulled = false; mesh.renderOrder = 5; mesh.userData.noPick = true; mesh.visible = false;
         shaftGroup.add(mesh);
@@ -2442,9 +2515,9 @@
       const inside = ceilGroup.visible;
       daylight.forEach(function (d) {
         const o = windowOpenness(d.id);
-        d.spot.intensity = inside ? DAY_SPOT * o : 0;
+        d.spot.intensity = inside ? DAY_SPOT * dayK * o : 0;
         if (d.shaft) {
-          const vis = inside && o > 0.02 && updateShaft(d);
+          const vis = inside && dayK > 0 && o > 0.02 && updateShaft(d);
           d.shaft.visible = !!vis;
           d.shaft.material.opacity = 0.13 * o;
         }
@@ -2467,7 +2540,7 @@
     function lampBoost(z) { let b = 0; lampState.forEach(function (l) { if (l.on && l.zone === z) b += 0.05; }); return b; }
     function fillTargets() {
       if (!ceilGroup.visible) { fillT[0] = fillT[1] = fillT[2] = fillT[3] = 1; return; }
-      const o = windowOpenness, dr = doorFrac, L = function (id) { return roomLights[id] && roomLights[id].on ? 1 : 0; };
+      const o = function (id) { return windowOpenness(id) * (0.2 + 0.8 * dayK); }, dr = doorFrac, L = function (id) { return roomLights[id] && roomLights[id].on ? 1 : 0; };
       fillT[0] = 0.17 + 0.83 * o('d1') + 0.06 * dr('d1') + 0.28 * L('d1') + lampBoost(0);
       fillT[1] = 0.17 + 0.83 * o('d2') + 0.06 * dr('d2') + 0.28 * L('d2') + lampBoost(1);
       fillT[2] = 0.13 + 0.2 * dr('banho') + 0.4 * L('banho') + (P.windows.banho ? 0.4 * o('banho') : 0);
@@ -2592,7 +2665,7 @@
         if (furn) for (let i = 0; i < furnHinges.length; i++) if (pushSeg(p, r, furnHinges[i])) hit = true;
         if (!hit) break;
       }
-      p.x = clamp(p.x, -CX + r, CX - r); p.z = clamp(p.z, -CZ + r, CZ - r);
+      clampWalk(p, r);
     }
     function maxPen(p, r) {
       let worst = 0;
@@ -2618,6 +2691,7 @@
     controls.screenSpacePanning = true;
     controls.enableRotate = false;
     controls.autoRotateSpeed = 0.9;
+    controls.enablePan = MX > 0;
     controls.autoRotate = !reduceMotion;
 
     let view = '3d', tween = null, currentRoom = null, prevWallsLow = false;
@@ -2627,10 +2701,11 @@
     let ptween = null;
 
     function fovSizes(fov) { const vt = Math.tan(THREE.MathUtils.degToRad(fov / 2)); return { vt: vt, ht: vt * camera.aspect }; }
+    let OV_AZ = THREE.MathUtils.degToRad(24);
     function overviewPose() {
       const fov = 36, s = fovSizes(fov), R = 5.25;
       const dist = R / Math.min(s.vt, s.ht) * (camera.aspect >= 1 ? 1.0 : 0.95);
-      const pol = THREE.MathUtils.degToRad(53), az = THREE.MathUtils.degToRad(24);
+      const pol = THREE.MathUtils.degToRad(53), az = OV_AZ;
       const target = new THREE.Vector3(0, 0.5, 0.2);
       const pos = new THREE.Vector3(Math.sin(pol) * Math.sin(az), Math.cos(pol), Math.sin(pol) * Math.cos(az)).multiplyScalar(dist).add(target);
       return { pos: pos, target: target, fov: fov };
@@ -2678,11 +2753,11 @@
       overlay.visible = state.overlay;
       if (prevWallsLow && !state.wallsLow) setWallsLow(true);
     }
-    function goOverview() {
+    function goOverview(ms) {
       if (immersive()) leaveImmersive();
       view = '3d'; camera.near = 0.15; syncUI();
       const p = overviewPose();
-      flyTo(p.pos, p.target, p.fov, 1000, function () { settleOutside(p.target); });
+      flyTo(p.pos, p.target, p.fov, typeof ms === 'number' ? ms : 1000, function () { settleOutside(p.target); });
     }
     function goTop() {
       if (immersive()) leaveImmersive();
@@ -2692,7 +2767,10 @@
     }
     function roomAt(x, z) {
       const px = (x + CX) * S + OX, pz = (z + CZ) * S + OY;
-      return P.rooms.find(function (rm) { return rm.rects.some(function (r) { return px >= r[0] && px <= r[2] && pz >= r[1] && pz <= r[3]; }); }) || null;
+      const rm = P.rooms.find(function (q) { return q.rects.some(function (r) { return px >= r[0] && px <= r[2] && pz >= r[1] && pz <= r[3]; }); });
+      if (rm) return rm;
+      const w = CORR_ROOM && CORR_ROOM.walk;
+      return w && x >= w[0] && x <= w[2] && z >= w[1] && z <= w[3] ? CORR_ROOM : null;
     }
     function focusCanvas() {
       try { if (document.activeElement && document.activeElement !== canvas && document.activeElement.blur) document.activeElement.blur(); canvas.focus({ preventScroll: true }); } catch (e) { /* sem foco */ }
@@ -2705,13 +2783,13 @@
       overlay.visible = false; hideTip();
     }
     function enterWalk(id) {
-      const rm = P.rooms.find(function (r) { return r.id === id; });
+      const rm = P.rooms.find(function (r) { return r.id === id; }) || (id === 'corredor' ? CORR_ROOM : null);
       if (!rm) return;
       beginImmersive();
       view = 'walk'; camera.near = 0.04; camera.updateProjectionMatrix(); currentRoom = rm;
       ceilGroup.visible = true;
-      const at = new THREE.Vector3(wx(rm.view.at[0]), EYE, wz(rm.view.at[1]));
-      const to = new THREE.Vector3(wx(rm.view.to[0]), EYE - 0.3, wz(rm.view.to[1]));
+      const at = rm.viewL ? rm.viewL.at.clone().setY(EYE) : new THREE.Vector3(wx(rm.view.at[0]), EYE, wz(rm.view.at[1]));
+      const to = rm.viewL ? rm.viewL.to.clone().setY(EYE - 0.3) : new THREE.Vector3(wx(rm.view.to[0]), EYE - 0.3, wz(rm.view.to[1]));
       const dir = to.sub(at).normalize();
       player.yaw = Math.atan2(dir.x, dir.z); player.pitch = Math.asin(clamp(dir.y, -1, 1));
       player.pos.copy(at);
@@ -2782,6 +2860,7 @@
       if (keys.has('KeyE') || keys.has('Space')) v += 1;
       if (keys.has('KeyQ') || keys.has('KeyC')) v -= 1;
       f -= joy.y; s += joy.x; v += upHeld - downHeld;
+      s *= MX; turn *= MX;
       const run = keys.has('ShiftLeft') || keys.has('ShiftRight');
       if (turn) player.yaw += turn * 1.9 * dt;
       const hasMove = Math.abs(f) > 0.05 || Math.abs(s) > 0.05 || (view === 'free' && Math.abs(v) > 0.05);
@@ -2843,7 +2922,7 @@
       const b = document.createElement('button');
       b.type = 'button'; b.className = 'room-btn';
       b.innerHTML = '<span class="n">' + rm.name + '</span><span class="a">' + rm.area + ' m²</span>' + (rm.dims ? '<span class="d">' + rm.dims + ' m</span>' : '');
-      b.addEventListener('click', function () { enterWalk(rm.id); });
+      on(b, 'click', function () { enterWalk(rm.id); });
       li.appendChild(b); roomList.appendChild(li); roomButtons[rm.id] = b;
     });
     if (mm('(min-width: 760px)')) roomsEl.open = true;
@@ -2854,14 +2933,14 @@
       b.type = 'button'; b.className = 'pill';
       b.innerHTML = '<b>' + rm.name + '</b><span>' + rm.area + ' m²' + (rm.dims ? '<i> · ' + rm.dims + '</i>' : '') + '</span>';
       b.setAttribute('aria-label', 'Entrar em ' + rm.name + ', ' + rm.area + ' metros quadrados');
-      b.addEventListener('click', function () { enterWalk(rm.id); });
+      on(b, 'click', function () { enterWalk(rm.id); });
       b.hidden = true;
       labelsEl.appendChild(b);
       return { el: b, pos: new THREE.Vector3(wx(rm.label[0]), 1.35, wz(rm.label[1])), shown: false };
     });
 
     function placeTouch() {
-      if (touchEl.hidden) return;
+      if (INTEG || touchEl.hidden) return;
       const a = app.getBoundingClientRect(), d = dock.getBoundingClientRect();
       touchEl.style.bottom = Math.max(16, a.bottom - d.top + 12) + 'px';
     }
@@ -2897,12 +2976,17 @@
       else if (view === 'free') h = kb ? mouseHow + ' · WASD voa · E ou Espaço sobe · Q desce · Shift acelera · Esc ' + (locked ? 'solta o mouse' : 'sai') : 'Joystick voa · botões sobem e descem · arraste para olhar · toque nos objetos para usar';
       else h = coarse ? 'Um dedo gira 360° · pinça aproxima · dois dedos movem · toque num nome para entrar' : 'Arraste para girar 360° · role para aproximar · botão direito move a maquete · clique num nome para entrar';
       hint.textContent = h;
-      if (EMBED) postParent({ type: 'apt:state', view: view, imm: imm, pose: !!player.pose, room: currentRoom ? currentRoom.id : null,
+      notifyView();
+      if (EMBED || opts.onMessage) postParent({ type: 'apt:state', view: view, imm: imm, pose: !!player.pose, room: currentRoom ? currentRoom.id : null,
         rotate: !!controls.autoRotate, wallsLow: state.wallsLow, furniture: state.furniture, labels: state.labels, doorsOpen: state.doorsOpen, overlay: state.overlay, hint: h });
     }
-    function postParent(msg) { try { if (window.parent && window.parent !== window) window.parent.postMessage(msg, '*'); } catch (e) { /* sem site em volta */ } }
+    function postParent(msg) {
+      if (opts.onMessage) { try { opts.onMessage(msg); } catch (e) { console.error(e); } return; }
+      try { if (window.parent && window.parent !== window) window.parent.postMessage(msg, '*'); } catch (e) { /* sem site em volta */ }
+    }
+    function notifyView() { if (INTEG && INTEG.onView) { try { INTEG.onView(view, ceilGroup.visible); } catch (e) { console.error(e); } } }
     // comandos vindos do painel do site: os mesmos botões da maquete, entrar num cômodo ou voltar à vista 3D
-    window.addEventListener('message', function (e) {
+    on(window, 'message', function (e) {
       if (!EMBED || e.source !== window.parent) return;
       const d = e.data || {};
       if (d.type === 'apt:cmd' && btn[d.id]) btn[d.id].click();
@@ -2910,18 +2994,18 @@
       else if (d.type === 'apt:hello') syncUI();
     });
 
-    btn.v3d.addEventListener('click', goOverview);
-    btn.vTop.addEventListener('click', goTop);
-    btn.vVisit.addEventListener('click', function () { if (view === 'free') walkFromFree(); else enterWalk(view === 'walk' && currentRoom ? currentRoom.id : 'circ'); });
-    btn.vFree.addEventListener('click', enterFree);
-    $('exitVisit').addEventListener('click', goOverview);
-    standBtn.addEventListener('click', function () { standUp(); focusCanvas(); });
-    btn.tRotate.addEventListener('click', function () { if (!immersive()) setRotate(!controls.autoRotate); });
-    btn.tWalls.addEventListener('click', function () { if (!immersive()) setWallsLow(!state.wallsLow); });
-    btn.tFurn.addEventListener('click', function () { state.furniture = !state.furniture; furnGroup.visible = state.furniture; dirtyShadows(); syncUI(); });
-    btn.tLabels.addEventListener('click', function () { state.labels = !state.labels; syncUI(); });
-    btn.tDoors.addEventListener('click', function () { state.doorsOpen = !state.doorsOpen; Object.keys(doorState).forEach(function (k) { doorState[k].open = state.doorsOpen; }); syncUI(); });
-    btn.tOverlay.addEventListener('click', function () {
+    on(btn.v3d, 'click', goOverview);
+    on(btn.vTop, 'click', goTop);
+    on(btn.vVisit, 'click', function () { if (view === 'free') walkFromFree(); else enterWalk(view === 'walk' && currentRoom ? currentRoom.id : 'circ'); });
+    on(btn.vFree, 'click', enterFree);
+    on($('exitVisit'), 'click', goOverview);
+    on(standBtn, 'click', function () { standUp(); focusCanvas(); });
+    on(btn.tRotate, 'click', function () { if (!immersive()) setRotate(!controls.autoRotate); });
+    on(btn.tWalls, 'click', function () { if (!immersive()) setWallsLow(!state.wallsLow); });
+    on(btn.tFurn, 'click', function () { state.furniture = !state.furniture; furnGroup.visible = state.furniture; dirtyShadows(); syncUI(); });
+    on(btn.tLabels, 'click', function () { state.labels = !state.labels; syncUI(); });
+    on(btn.tDoors, 'click', function () { state.doorsOpen = !state.doorsOpen; Object.keys(doorState).forEach(function (k) { doorState[k].open = state.doorsOpen; }); syncUI(); });
+    on(btn.tOverlay, 'click', function () {
       state.overlay = !state.overlay;
       overlay.visible = state.overlay && !immersive();
       syncUI();
@@ -2936,11 +3020,12 @@
     function pick(cx, cy) {
       const rect = canvas.getBoundingClientRect();
       ndc.set(((cx - rect.left) / rect.width) * 2 - 1, -((cy - rect.top) / rect.height) * 2 + 1);
-      raycaster.setFromCamera(ndc, camera);
+      raycaster.setFromCamera(ndc, camW || camera);
       const hits = raycaster.intersectObjects(pickRoots, true);
       for (let i = 0; i < hits.length; i++) {
         const h = hits[i], o = h.object;
         if (o.userData.noPick || !visibleChain(o)) continue;
+        if (UINV) h.point.applyMatrix4(UINV);                     // ponto de volta para as coordenadas da planta
         let q = o; while (q && !q.userData.inter) q = q.parent;
         return { hit: h, inter: q ? q.userData.inter : null };
       }
@@ -2962,7 +3047,7 @@
       if (view === 'walk' && !player.pose && res && res.hit.object.userData.walk) { player.target = { x: res.hit.point.x, z: res.hit.point.z }; player.stuck = 0; }
     }
     /* visão sem inversão: direita olha para a direita, cima olha para cima */
-    function look(dx, dy, k) { player.yaw -= dx * k; player.pitch = clamp(player.pitch - dy * k, -1.35, 1.35); markDirty(); }
+    function look(dx, dy, k) { player.yaw -= MX * dx * k; player.pitch = clamp(player.pitch - dy * k, -1.35, 1.35); markDirty(); }
     /* computador: o mouse é capturado e controla a visão sem segurar o clique; a mira no centro usa os objetos */
     const canLock = !coarse && typeof canvas.requestPointerLock === 'function';
     let locked = false, lockFailed = !canLock, lockReleasedAt = -1e9, hoverLast = null, edgeX = 0, centerT = 0;
@@ -2975,19 +3060,19 @@
       } catch (err) { lockFailed = true; syncUI(); }
     }
     function autoLock() { if (!coarse) requestLock(); }
-    document.addEventListener('pointerlockchange', function () {
+    on(document, 'pointerlockchange', function () {
       const was = locked; locked = document.pointerLockElement === canvas;
       if (was && !locked) lockReleasedAt = performance.now();
       hoverLast = null; hideTip(); syncUI();
     });
-    document.addEventListener('pointerlockerror', function () { lockFailed = true; syncUI(); });
-    document.addEventListener('mousemove', function (e) {
+    on(document, 'pointerlockerror', function () { lockFailed = true; syncUI(); });
+    on(document, 'mousemove', function (e) {
       if (!locked || !immersive() || tween) return;
       look(e.movementX || 0, e.movementY || 0, 0.0022 * camera.fov / 70);
     });
     function centerXY() { const r = canvas.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; }
     let drag = null;
-    canvas.addEventListener('pointerdown', function (e) {
+    on(canvas, 'pointerdown', function (e) {
       if (!immersive() || tween) return;
       if (e.pointerType === 'mouse') {
         if (e.button !== 0) return;
@@ -3000,7 +3085,7 @@
       try { canvas.setPointerCapture(e.pointerId); } catch (err) { /* sem captura */ }
       hideTip();
     });
-    canvas.addEventListener('pointermove', function (e) {
+    on(canvas, 'pointermove', function (e) {
       if (drag && e.pointerId === drag.id) {
         look(e.clientX - drag.x, e.clientY - drag.y, 0.0042 * camera.fov / 70);
         drag.x = e.clientX; drag.y = e.clientY;
@@ -3013,14 +3098,14 @@
         edgeX = fx < 0.08 ? -(0.08 - fx) / 0.08 : fx > 0.92 ? (fx - 0.92) / 0.08 : 0;
       }
     });
-    canvas.addEventListener('pointerup', function (e) {
+    on(canvas, 'pointerup', function (e) {
       if (!drag || e.pointerId !== drag.id) return;
       const moved = Math.hypot(e.clientX - drag.sx, e.clientY - drag.sy), dt = performance.now() - drag.t;
       drag = null;
       if (moved < 8 && dt < 600) clickAt(e.clientX, e.clientY);
     });
-    canvas.addEventListener('pointercancel', function () { drag = null; });
-    canvas.addEventListener('pointerleave', function () { hoverLast = null; edgeX = 0; });
+    on(canvas, 'pointercancel', function () { drag = null; });
+    on(canvas, 'pointerleave', function () { hoverLast = null; edgeX = 0; });
 
     /* maquete 3D: arrastar para a direita leva a câmera para a direita; para cima, a câmera olha para cima */
     const orbit = { id: null, x: 0, y: 0, t: 0, vth: 0, vph: 0 };
@@ -3036,7 +3121,7 @@
       camera.lookAt(controls.target);
       markDirty();
     }
-    canvas.addEventListener('pointerdown', function (e) {
+    on(canvas, 'pointerdown', function (e) {
       if (e.pointerType === 'touch') activeTouches.add(e.pointerId);
       if (immersive() || tween) return;
       if (activeTouches.size > 1) { orbit.id = null; orbit.vth = 0; orbit.vph = 0; return; }
@@ -3044,10 +3129,10 @@
       orbit.id = e.pointerId; orbit.x = e.clientX; orbit.y = e.clientY; orbit.t = performance.now(); orbit.vth = 0; orbit.vph = 0;
       if (controls.autoRotate) setRotate(false);
     });
-    window.addEventListener('pointermove', function (e) {
+    on(window, 'pointermove', function (e) {
       if (orbit.id === null || e.pointerId !== orbit.id || immersive()) return;
       const k = 2 * Math.PI / Math.max(200, canvas.clientHeight || 800) * 0.85;
-      const dth = (e.clientX - orbit.x) * k, dph = -(e.clientY - orbit.y) * k;
+      const dth = MX * (e.clientX - orbit.x) * k, dph = -(e.clientY - orbit.y) * k;
       orbitBy(dth, dph);
       orbit.vth = dth; orbit.vph = dph; orbit.t = performance.now();
       orbit.x = e.clientX; orbit.y = e.clientY;
@@ -3056,9 +3141,9 @@
       activeTouches.delete(e.pointerId);
       if (orbit.id === e.pointerId) { orbit.id = null; if (performance.now() - orbit.t > 70) { orbit.vth = 0; orbit.vph = 0; } }
     }
-    window.addEventListener('pointerup', endPointer);
-    window.addEventListener('pointercancel', endPointer);
-    canvas.addEventListener('wheel', function (e) {
+    on(window, 'pointerup', endPointer);
+    on(window, 'pointercancel', endPointer);
+    on(canvas, 'wheel', function (e) {
       if (!immersive()) return;
       e.preventDefault();
       camera.fov = clamp(camera.fov + Math.sign(e.deltaY) * 4, 38, 84); camera.updateProjectionMatrix(); markDirty();
@@ -3072,18 +3157,18 @@
       joy.x = dx / R; joy.y = dy / R;
       knob.style.transform = 'translate(' + dx.toFixed(1) + 'px,' + dy.toFixed(1) + 'px)';
     }
-    joyEl.addEventListener('pointerdown', function (e) { joy.id = e.pointerId; try { joyEl.setPointerCapture(e.pointerId); } catch (er) { /* sem captura */ } moveJoy(e); e.preventDefault(); });
-    joyEl.addEventListener('pointermove', function (e) { if (e.pointerId === joy.id) moveJoy(e); });
+    on(joyEl, 'pointerdown', function (e) { joy.id = e.pointerId; try { joyEl.setPointerCapture(e.pointerId); } catch (er) { /* sem captura */ } moveJoy(e); e.preventDefault(); });
+    on(joyEl, 'pointermove', function (e) { if (e.pointerId === joy.id) moveJoy(e); });
     function endJoy(e) { if (e.pointerId !== joy.id) return; joy.id = null; joy.x = 0; joy.y = 0; knob.style.transform = 'translate(0px,0px)'; }
-    joyEl.addEventListener('pointerup', endJoy); joyEl.addEventListener('pointercancel', endJoy);
+    on(joyEl, 'pointerup', endJoy); on(joyEl, 'pointercancel', endJoy);
     [['btnUp', 1], ['btnDown', -1]].forEach(function (p) {
       const el = $(p[0]);
-      const on = function (e) { e.preventDefault(); if (p[1] > 0) upHeld = 1; else downHeld = 1; };
-      const off = function () { if (p[1] > 0) upHeld = 0; else downHeld = 0; };
-      el.addEventListener('pointerdown', on); el.addEventListener('pointerup', off); el.addEventListener('pointercancel', off); el.addEventListener('pointerleave', off);
+      const press = function (e) { e.preventDefault(); if (p[1] > 0) upHeld = 1; else downHeld = 1; };
+      const release = function () { if (p[1] > 0) upHeld = 0; else downHeld = 0; };
+      on(el, 'pointerdown', press); on(el, 'pointerup', release); on(el, 'pointercancel', release); on(el, 'pointerleave', release);
     });
     const MOVE = ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'KeyQ', 'KeyE', 'KeyC', 'Space', 'ShiftLeft', 'ShiftRight'];
-    window.addEventListener('keydown', function (e) {
+    on(window, 'keydown', function (e) {
       if (!immersive()) return;
       if (e.key === 'Escape') {
         if (locked) { try { document.exitPointerLock(); } catch (er) { /* já solto */ } return; }
@@ -3092,29 +3177,40 @@
       }
       if (MOVE.indexOf(e.code) >= 0) { keys.add(e.code); if (e.code.indexOf('Arrow') === 0 || e.code === 'Space') e.preventDefault(); }
     });
-    window.addEventListener('keyup', function (e) { keys.delete(e.code); });
-    window.addEventListener('blur', function () { keys.clear(); upHeld = 0; downHeld = 0; });
+    on(window, 'keyup', function (e) { keys.delete(e.code); });
+    on(window, 'blur', function () { keys.clear(); upHeld = 0; downHeld = 0; });
 
     /* ---------------- tema, tamanho ---------------- */
     function applyTheme() { markDirty(); }   // o fundo é o céu da paisagem, igual nos dois temas
-    if (window.matchMedia) {
+    if (!INTEG && window.matchMedia) {
       const mq = matchMedia('(prefers-color-scheme: dark)');
-      if (mq.addEventListener) mq.addEventListener('change', applyTheme); else if (mq.addListener) mq.addListener(applyTheme);
+      if (mq.addEventListener) on(mq, 'change', applyTheme); else if (mq.addListener) mq.addListener(applyTheme);
     }
-    if (window.MutationObserver) new MutationObserver(applyTheme).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme', 'class', 'style'] });
+    if (!INTEG && window.MutationObserver) new MutationObserver(applyTheme).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme', 'class', 'style'] });
     function resize() {
       const w = stage.clientWidth || window.innerWidth, h = stage.clientHeight || window.innerHeight;
-      renderer.setSize(w, h, false);
+      if (!INTEG) renderer.setSize(w, h, false);                // no prédio, quem dimensiona o canvas é o prédio
       camera.aspect = w / Math.max(1, h); camera.updateProjectionMatrix();
       sizeMirrors();
       placeTouch(); markDirty();
     }
-    if (window.ResizeObserver) new ResizeObserver(resize).observe(stage); else window.addEventListener('resize', resize);
+    const resizeObs = window.ResizeObserver ? new ResizeObserver(resize) : null;
+    if (resizeObs) { resizeObs.observe(stage); offs.push(function () { resizeObs.disconnect(); }); } else on(window, 'resize', resize);
     resize(); applyTheme();
 
-    const start = overviewPose();
-    camera.position.copy(start.pos); camera.fov = start.fov; camera.updateProjectionMatrix();
-    controls.target.copy(start.target); controls.update();
+    let entryFly = false;
+    if (INTEG && INTEG.camera) {
+      const cp = new THREE.Vector3().fromArray(INTEG.camera.pos).applyMatrix4(UINV), ct = new THREE.Vector3().fromArray(INTEG.camera.target).applyMatrix4(UINV);
+      OV_AZ = Math.atan2(cp.x, cp.z - 0.2);                     // chega pelo mesmo lado de onde a câmera do prédio estava
+      camera.position.copy(cp); camera.fov = INTEG.camera.fov || 30; camera.updateProjectionMatrix(); camera.lookAt(ct);
+      controls.target.copy(ct); controls.enabled = false; controls.autoRotate = false;
+      controls.maxDistance = Math.max(140, cp.distanceTo(ct) + 1);
+      entryFly = true;
+    } else {
+      const start = overviewPose();
+      camera.position.copy(start.pos); camera.fov = start.fov; camera.updateProjectionMatrix();
+      controls.target.copy(start.target); controls.update();
+    }
     syncUI();
 
     const pv = new THREE.Vector3();
@@ -3124,7 +3220,7 @@
       pills.forEach(function (p) {
         let vis = show;
         if (vis) {
-          pv.copy(p.pos).project(camera);
+          pv.copy(p.pos); if (U) pv.applyMatrix4(U); pv.project(camW || camera);
           vis = pv.z > -1 && pv.z < 1 && Math.abs(pv.x) < 1.1 && Math.abs(pv.y) < 1.1;
           if (vis) p.el.style.transform = 'translate3d(' + ((pv.x + 1) / 2 * w).toFixed(1) + 'px,' + ((1 - pv.y) / 2 * h).toFixed(1) + 'px,0) translate(-50%,-50%)';
         }
@@ -3188,11 +3284,35 @@
       return active;
     }
 
+    /* ---------------- desenho: no prédio, a mesma câmera no mundo desenha o prédio e depois a maquete ---------------- */
+    const _wp = new THREE.Vector3(), _wf = new THREE.Vector3(), _wu = new THREE.Vector3();
+    function syncWorldCam() {
+      _wp.copy(camera.position).applyMatrix4(U);
+      _wf.set(0, 0, -1).applyQuaternion(camera.quaternion).transformDirection(U);
+      _wu.set(0, 1, 0).applyQuaternion(camera.quaternion).transformDirection(U);
+      camW.position.copy(_wp); camW.up.copy(_wu); camW.lookAt(_wp.add(_wf));     // câmera sem espelho, mesmo nos aptos espelhados
+      camW.fov = camera.fov; camW.aspect = camera.aspect; camW.near = camera.near; camW.far = camera.far;
+      camW.updateProjectionMatrix(); camW.updateMatrixWorld();
+    }
+    function renderAll() {
+      if (!INTEG) { renderer.render(scene, camera); return; }
+      syncWorldCam();
+      const aptShadows = renderer.shadowMap.needsUpdate;
+      if (INTEG.renderWorld) INTEG.renderWorld(camW);
+      renderer.autoClear = false;
+      renderer.toneMappingExposure = 1.0;
+      renderer.shadowMap.needsUpdate = aptShadows;
+      renderer.render(scene, camW);
+      renderer.autoClear = true;
+    }
+    if (U) scene.updateMatrixWorld(true);
+
     /* ---------------- laço de render (só desenha quando algo muda) ---------------- */
     const lastCam = { p: new THREE.Vector3(Infinity, 0, 0), q: new THREE.Quaternion(), fov: 0 };
     let last = performance.now(), ready = false, frameErr = false, lastCeilVis = null;
     function frame(now) {
-      requestAnimationFrame(frame);
+      if (disposed) return;
+      rafId = requestAnimationFrame(frame);
       try {
         now = now || performance.now();
         const dt = Math.min(0.05, Math.max(0, (now - last) / 1000)); last = now;
@@ -3205,7 +3325,7 @@
           if (ceilGroup.visible !== ceilOn) { ceilGroup.visible = ceilOn; markDirty(); }
           const rm = roomAt(player.pos.x, player.pos.z);
           if (view === 'walk' ? (rm && rm !== currentRoom) : rm !== currentRoom) { currentRoom = rm; syncUI(); }
-          if (edgeX && lockFailed && !locked) { player.yaw -= edgeX * 1.7 * dt; markDirty(); }
+          if (edgeX && lockFailed && !locked) { player.yaw -= MX * edgeX * 1.7 * dt; markDirty(); }
           if (mouseAim() && now - centerT > 90) {
             centerT = now;
             const c = centerXY(), res = pick(c.x, c.y);
@@ -3220,7 +3340,7 @@
         }
         sky.position.copy(camera.position);
         sunSprite.position.set(camera.position.x + SUN_DIR.x * 1000, camera.position.y + SUN_DIR.y * 1000, camera.position.z + SUN_DIR.z * 1000);
-        if (ceilGroup.visible !== lastCeilVis) { lastCeilVis = ceilGroup.visible; dirtyShadows(); updateDaylight(); }
+        if (ceilGroup.visible !== lastCeilVis) { lastCeilVis = ceilGroup.visible; dirtyShadows(); updateDaylight(); notifyView(); }
         let anim = stepHinges(archHinges, dt);
         anim = stepHinges(furnHinges, dt) || anim;
         const winMoving = stepWindows(dt);
@@ -3235,18 +3355,19 @@
         doorGroup.visible = !state.wallsLow || immersive();
         const camMoved = !camera.position.equals(lastCam.p) || !camera.quaternion.equals(lastCam.q) || camera.fov !== lastCam.fov;
         if (needsRender || camMoved || anim || fx || fl) {
-          renderer.render(scene, camera);
+          renderAll();
           lastCam.p.copy(camera.position); lastCam.q.copy(camera.quaternion); lastCam.fov = camera.fov;
           needsRender = false;
           updatePills();
           checkPrograms();
         }
+        if (ready && entryFly) { entryFly = false; goOverview(reduceMotion ? 0 : 1500); }
         if (!ready) {
           ready = true; window.__aptReady = true;
-          if (EMBED) { postParent({ type: 'apt:ready', tipo: P.id, titulo: P.meta.titulo, area: P.meta.area, comodos: P.meta.comodos,
-            rooms: P.rooms.map(function (r) { return { id: r.id, name: r.name, area: r.area, dims: r.dims }; }) }); syncUI(); }
-          if (errBox) errBox.hidden = true;
-          if (loadingEl) { loadingEl.classList.add('done'); setTimeout(function () { loadingEl.hidden = true; }, 500); }
+          if (EMBED || opts.onMessage) { postParent({ type: 'apt:ready', tipo: P.id, titulo: P.meta.titulo, area: P.meta.area, comodos: P.meta.comodos,
+            rooms: P.rooms.map(function (r) { return { id: r.id, name: r.name, area: r.area, dims: r.dims }; })
+              .concat(CORR_ROOM ? [{ id: 'corredor', name: CORR_ROOM.name, area: '', dims: '' }] : []) }); syncUI(); }
+          if (opts.onReady) opts.onReady();
         }
       } catch (e) {
         if (!frameErr) { frameErr = true; console.error(e); }
@@ -3256,6 +3377,59 @@
       roomLights: roomLights, setRoomLight: setRoomLight, fillC: fillC, fillT: fillT, toiletState: toiletState, flush: flush, daylight: daylight, windowOpenness: windowOpenness,
       lightRig: lightRig, pointZones: pointZones, spotZones: spotZones, APT_U: APT_U, aptPatch: aptPatch, getAptLevel: function () { return aptLevel; }, landInfo: landInfo, xmas: xmas, setXmas: setXmas, XMAS_CORNER: XMAS_CORNER, M: M, sliders: sliders, acs: acs, mirrors: mirrors, consoleState: consoleState, setConsole: setConsole, getEstarTv: function () { return estarTv; },
       landGroup: landGroup, sky: sky, sunSprite: sunSprite, lampState: lampState, ceilGroup: ceilGroup, SUN_DIR: SUN_DIR, GROUND_Y: GROUND_Y, ZONE_RECTS: ZONE_RECTS, shutterBottomOf: shutterBottomOf });
-    requestAnimationFrame(frame);
+    /* ---------------- noite (tema escuro do site): sem sol, luzes dos cômodos acesas ---------------- */
+    function setNight(on) {
+      dayK = on ? 0 : 1;
+      sun.intensity = on ? 0.06 : 1.5;
+      hemi.intensity = on ? 0.12 : 0.46;
+      Object.keys(roomLights).forEach(function (id) { setRoomLight(id, !!on); });
+      updateDaylight(); dirtyShadows();
+    }
+    if (INTEG && INTEG.night) setNight(true);
+
+    /* ---------------- sair: solta ouvintes, para o laço e libera a memória da placa de vídeo ---------------- */
+    let disposed = false, rafId = 0;
+    function dispose() {
+      if (disposed) return;
+      disposed = true;
+      cancelAnimationFrame(rafId);
+      try { if (locked && document.exitPointerLock) document.exitPointerLock(); } catch (e) { /* já solto */ }
+      offs.splice(0).forEach(function (f) { try { f(); } catch (e) { /* já solto */ } });
+      try { controls.dispose(); } catch (e) { /* sem controles */ }
+      try { if (actx) actx.close(); } catch (e) { /* sem som */ }
+      labelsEl.textContent = ''; tip.hidden = true; crosshair.hidden = true; visitBar.hidden = true; touchEl.hidden = true;
+      app.classList.remove('is-immersive', 'is-locked');
+      canvas.style.cursor = '';
+      const mats = new Set(aptMats), geos = new Set(), texs = new Set();
+      scene.traverse(function (o) {
+        if (o.geometry) geos.add(o.geometry);
+        const m = o.material; (Array.isArray(m) ? m : m ? [m] : []).forEach(function (x) { mats.add(x); });
+        if (o.isLight && o.shadow && o.shadow.map) o.shadow.map.dispose();
+      });
+      mats.forEach(function (m) {
+        ['map', 'emissiveMap', 'envMap', 'normalMap', 'roughnessMap', 'alphaMap'].forEach(function (k) { if (m[k] && m[k].isTexture) texs.add(m[k]); });
+        m.dispose();
+      });
+      geos.forEach(function (g) { g.dispose(); });
+      texs.forEach(function (t) { t.dispose(); });
+      mirrors.forEach(function (m) { try { m.getRenderTarget().dispose(); } catch (e) { /* sem espelho */ } });
+      if (interiorEnv) interiorEnv.dispose();
+      if (skyEnv) skyEnv.dispose();
+    }
+
+    rafId = requestAnimationFrame(frame);
+    return {
+      dispose: dispose,
+      setNight: function (on) { setNight(on); markDirty(); },
+      cmd: function (id) { if (btn[id]) btn[id].click(); },
+      room: function (id) { enterWalk(id); },
+      // onde a câmera está, no mundo do prédio (para o prédio continuar dali ao sair)
+      worldCamera: function () {
+        const p = camera.position.clone(), t = currentTarget();
+        if (U) { p.applyMatrix4(U); t.applyMatrix4(U); }
+        return { pos: p.toArray(), target: t.toArray(), fov: camera.fov };
+      },
+      view: function () { return view; }
+    };
   }
 })();

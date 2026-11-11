@@ -7,7 +7,7 @@ Cada empreendimento tem um site onde a pessoa gira o prédio em 3D, escolhe a to
 
 | Empreendimento | Construtora | Cidade | Site | O que tem |
 | --- | --- | --- | --- | --- |
-| [Residencial Milão](empreendimentos/residencial-milao/) | Baliza | São Leopoldo/RS | [`site/`](empreendimentos/residencial-milao/site/) | 2 torres lado a lado em 3D, escolha por andar, planta do andar, ficha do apto, visita 3D das duas plantas (com e sem sacada) no mesmo palco |
+| [Residencial Milão](empreendimentos/residencial-milao/) | Baliza | São Leopoldo/RS | [`site/`](empreendimentos/residencial-milao/site/) | 2 torres lado a lado em 3D, escolha por andar, andar aberto com cada apto em miniatura 3D, dois cliques para entrar no apto no lugar dele no bloco, visita a pé com saída para o corredor do andar |
 
 ## Estrutura
 
@@ -22,17 +22,18 @@ Plantas_Construtoras/
 │           ├── js/dados.js        dados do empreendimento (fonte única: preços, plantas, lazer)
 │           ├── js/predio3d.js     torres em 3D (Three.js / WebGL)
 │           ├── js/app.js          painel de andares, ficha do apto, visita 3D, mensagem
-│           └── apartamento/       maquete 3D do apartamento por dentro (abre dentro do site ou sozinha)
+│           └── apartamento/       maquete 3D do apartamento por dentro (abre dentro da cena do prédio ou sozinha)
 │               ├── index.html
 │               ├── estilo.css
-│               ├── app.js                 motor da maquete (visita, física, luzes, objetos interativos)
+│               ├── app.js                 motor da maquete: AptEngine.create (visita, física, luzes, objetos interativos)
 │               ├── planta-sem-sacada.js   paredes, portas, janelas e cômodos medidos da planta de meio
 │               ├── planta-com-sacada.js   o mesmo para a planta de canto, com a sacada
 │               └── planta-*.jpg           plantas oficiais (sobreposição no 3D)
 ├── ferramentas/
 │   ├── montar_artifact.py         checa, testa e gera a versão de publicação em dist/
 │   ├── teste_fumaca.js            roda os scripts com um 3D e um DOM falsos e acusa erros de JavaScript
-│   └── roteiros/milao-site.js     cliques simulados no site (abrir andar, escolher apto, entrar e sair da visita)
+│   ├── capturas.js                fotos reais do 3D num Chromium sem janela (entrar no apto, corredor, voltar)
+│   └── roteiros/milao-site.js     cliques simulados no site (abrir andar, dois cliques no apto, corredor, apto espelhado, sair)
 └── dist/                          (gerado, fora do git)
 ```
 
@@ -84,4 +85,13 @@ node ferramentas/teste_fumaca.js empreendimentos/residencial-milao/site/index.ht
 node ferramentas/teste_fumaca.js empreendimentos/residencial-milao/site/apartamento/index.html "#tipo=com-sacada&embed=1&andar=8"
 ```
 
-O teste não desenha o 3D: ele confirma que os scripts rodam sem erro. A conferência visual é no navegador.
+O teste não desenha o 3D: ele confirma que os scripts rodam sem erro.
+
+Para ver o 3D de verdade sem abrir o navegador na mão, `ferramentas/capturas.js` abre o site num Chromium sem janela
+(Playwright), abre o 8º andar, entra no apto com dois cliques e tira fotos de cada vista, do corredor e da volta ao andar:
+
+```bash
+npm i -D playwright && npx playwright install chromium     # uma vez
+node ferramentas/capturas.js empreendimentos/residencial-milao/site capturas
+# sem internet: --libs <clone do three.js na tag r128>
+```

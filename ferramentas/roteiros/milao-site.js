@@ -1,21 +1,17 @@
-// Roteiro do site do Residencial Milão: abre um andar, escolhe um apto de meio e um de canto,
-// entra na visita 3D, recebe as mensagens da maquete, troca a vista e volta ao prédio.
+// Roteiro do site do Residencial Milão: abre um andar, entra com dois cliques num apto de meio (a maquete abre no lugar dele,
+// dentro da cena do prédio), troca a vista, vai para o corredor, sai; depois entra num apto de canto espelhado pelo botão da ficha.
 module.exports = function (t) {
-  const andar = { dataset: { andar: '8' } };
-  t.clicar('listaAndares', andar);
+  t.clicar('listaAndares', { dataset: { andar: '8' } });
   t.avancar(3); t.esperar();
-  t.clicar('planta', { dataset: { pos: '3' } });                // apto 803, sem sacada
-  t.clicar('btnTour');
-  t.esperar(); t.avancar(3);
-  const maquete = t.el('aptFrame').contentWindow;
-  t.mensagem({ type: 'apt:ready', tipo: 'sem-sacada', comodos: '40,54', rooms: [{ id: 'd1', name: 'Dormitório 1', area: '10,24', dims: '2,37 × 4,32' }] }, maquete);
-  t.mensagem({ type: 'apt:state', view: 'walk', imm: true, room: 'd1', rotate: false, wallsLow: false, furniture: true, labels: true, doorsOpen: true, overlay: false, hint: '' }, maquete);
+  t.disparar('planta', 'dblclick', { dataset: { pos: '3' } });      // apto 803, sem sacada: dois cliques na planta do painel
+  t.avancar(2); t.esperar(); t.avancar(6);
+  t.clicar('aptoComodos', { dataset: { room: 'corredor' } });
+  t.avancar(4);
   t.clicar('btnSairApto');
   t.esperar(); t.avancar(3);
-  t.clicar('planta', { dataset: { pos: '1' } });                // apto 801, com sacada
+  t.clicar('planta', { dataset: { pos: '6' } });                     // apto 806, com sacada, planta espelhada
   t.clicar('btnTour');
-  t.esperar();
-  t.mensagem({ type: 'apt:error' }, t.el('aptFrame').contentWindow);
+  t.avancar(2); t.esperar(); t.avancar(6);
   t.clicar('btnSairApto');
   t.esperar();
   t.clicar('btnVoltar');

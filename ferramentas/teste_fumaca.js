@@ -9,7 +9,7 @@
  *   node ferramentas/teste_fumaca.js <pagina.html> [hash] [quadros] [roteiro.js]
  *   node ferramentas/teste_fumaca.js empreendimentos/residencial-milao/site/apartamento/index.html "#tipo=com-sacada&embed=1&andar=8"
  * O roteiro (opcional) simula cliques e mensagens depois que a página carrega: module.exports = function (t) { ... }
- * com t.clicar(id, alvo), t.mensagem(dados, origem), t.el(id), t.avancar(quadros) e t.esperar().
+ * com t.clicar(id, alvo), t.disparar(id, tipo, alvo), t.mensagem(dados, origem), t.el(id), t.avancar(quadros) e t.esperar().
  */
 'use strict';
 const fs = require('fs');
@@ -126,10 +126,11 @@ if (roteiroArg) {
   const t = {
     el,
     avancar, esperar,
-    clicar(id, alvo) {
+    clicar(id, alvo) { this.disparar(id, 'click', alvo); this.disparar(id, 'submit', alvo); },
+    disparar(id, tipo, alvo) {
       const e = el(id), ev = { target: alvo || e, preventDefault() {}, stopPropagation() {} };
       if (alvo && !alvo.closest) ev.target = Object.assign({ closest: () => alvo }, alvo);
-      (e.__ev.click || []).concat(e.__ev.submit || []).forEach((fn) => { try { fn(ev); } catch (er) { erros.push('clique em ' + id + ': ' + er.stack); } });
+      (e.__ev[tipo] || []).forEach((fn) => { try { fn(ev); } catch (er) { erros.push(tipo + ' em ' + id + ': ' + er.stack); } });
     },
     mensagem(dados, origem) {
       (ouvintes['win:message'] || []).forEach((fn) => { try { fn({ data: dados, source: origem }); } catch (er) { erros.push('mensagem ' + (dados && dados.type) + ': ' + er.stack); } });

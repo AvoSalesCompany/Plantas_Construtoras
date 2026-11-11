@@ -14,6 +14,9 @@ window.PLANS['com-sacada'] = {
   doorTop: 2.10,
   frame: 0.045,
   outline: [[21, 23], [801, 23], [801, 669], [666, 669], [666, 752], [398, 752], [398, 656], [142, 656], [142, 491], [21, 491]],
+  // face voltada para o corredor do prédio, em px [x0, x1, y]: 'linha' = parede do corredor na frente deste apto (vizinhos);
+  // 'fecha' = recuos do contorno que o corredor fecha quando se visita este apto
+  corredor: { linha: [[21, 398, 669], [398, 666, 752], [666, 801, 669]], fecha: [[21, 142, 669]] },
   // contorno do prédio nos andares de baixo (sem a área da sacada, que vira sacadas empilhadas)
   body: [[21, 23], [547, 23], [547, 129], [790, 129], [790, 23], [801, 23], [801, 669], [666, 669], [666, 752], [398, 752], [398, 656], [142, 656], [142, 491], [21, 491]],
   walls: [

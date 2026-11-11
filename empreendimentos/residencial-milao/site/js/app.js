@@ -41,7 +41,10 @@
     const cs = getComputedStyle(document.documentElement), v = function (n) { return cs.getPropertyValue(n).trim(); };
     return { gold: v('--gold') || '#D3A02B', navy: v('--navy') || '#1F2E86', livre: v('--livre') || '#1E8A62', reservado: v('--reservado') || '#C9821A', vendido: v('--vendido') || '#A9AEBB' };
   }
-  function onTheme() { if (predio) { predio.setColors(tokens()); predio.setNight(isDark()); } }
+  function onTheme() {
+    if (predio) { predio.setColors(tokens()); predio.setNight(isDark()); }
+    if (apto && apto.engine) apto.engine.setNight(isDark());
+  }
   if (window.matchMedia) { const mq = matchMedia('(prefers-color-scheme: dark)'); (mq.addEventListener ? mq.addEventListener('change', onTheme) : mq.addListener(onTheme)); }
   new MutationObserver(onTheme).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 
@@ -70,6 +73,7 @@
   });
 
   function setTorre(t) {
+    if (apto) sairApto();                 // trocar de torre durante a visita: sai do apto antes
     state.torre = t;
     $('torreA').setAttribute('aria-pressed', t === 'A'); $('torreB').setAttribute('aria-pressed', t === 'B');
     renderAndares();
@@ -78,6 +82,7 @@
   $('torreA').addEventListener('click', function () { setTorre('A'); });
   $('torreB').addEventListener('click', function () { setTorre('B'); });
   $('filtroTipo').addEventListener('change', function (ev) {
+    if (apto) sairApto();
     state.filtro = ev.target.value;
     renderAndares();
     if (state.andar) renderPlanta();
@@ -86,6 +91,7 @@
 
   /* ---------- andar aberto ---------- */
   function abrirAndar(andar, fromScene) {
+    if (apto) sairApto();
     state.andar = andar; state.pos = 0;
     $('viewAndares').hidden = true; $('viewAndar').hidden = false;
     $('andarTitulo').textContent = andar + 'º andar';
@@ -119,16 +125,16 @@
     });
   });
   function renderPlanta() {
-    const S = 10, HLm = Predio3D.L / 2, X = function (x) { return (x + HLm) * S; }, Y = function (z) { return (z + 7.5) * S; };
-    const R = Predio3D.unitRect, W = Predio3D.L * S;
-    let svg = '<rect class="pl-slab" x="0" y="0" width="' + W + '" height="150" rx="3"/>';
-    const nucleos = [[-1.8, 1.8, 0.9, 7.5], [-1.8, 1.8, -7.5, -0.9]];
-    Predio3D.BAYS.forEach(function (b) { if (b[0] === 'faixa') { nucleos.push([b[1], b[2], 0.9, 7.3], [b[1], b[2], -7.3, -0.9]); } });
+    const S = 10, HLm = Predio3D.L / 2, HDm = Predio3D.HD, CR = Predio3D.CORR, X = function (x) { return (x + HLm) * S; }, Y = function (z) { return (z + HDm) * S; };
+    const R = Predio3D.unitRect, W = Predio3D.L * S, H = Predio3D.D * S;
+    let svg = '<rect class="pl-slab" x="0" y="0" width="' + W + '" height="' + H + '" rx="3"/>';
+    const nucleos = [[-1.8, 1.8, CR, HDm - 0.5], [-1.8, 1.8, -HDm + 0.5, -CR]];
+    Predio3D.BAYS.forEach(function (b) { if (b[0] === 'faixa') { nucleos.push([b[1], b[2], CR, HDm - 0.3], [b[1], b[2], -HDm + 0.3, -CR]); } });
     nucleos.forEach(function (c) {
       svg += '<rect class="pl-core" x="' + X(c[0]) + '" y="' + Y(c[2]) + '" width="' + (c[1] - c[0]) * S + '" height="' + (c[3] - c[2]) * S + '" rx="2"/>';
     });
     svg += '<text class="pl-txt" x="' + W / 2 + '" y="-12" text-anchor="middle">Fundos</text>';
-    svg += '<text class="pl-txt" x="' + W / 2 + '" y="180" text-anchor="middle">Frente · entrada</text>';
+    svg += '<text class="pl-txt" x="' + W / 2 + '" y="' + (H + 30) + '" text-anchor="middle">Frente · entrada</text>';
     for (let p = 1; p <= 12; p++) {
       const r = R(p), u = info(state.torre, state.andar, p), dim = !matches(p), pose = Predio3D.planPose(p);
       const x = X(r.x0) + 1, w = (r.x1 - r.x0) * S - 2, y = Y(r.z0) + 1, h = (r.z1 - r.z0) * S - 2;
@@ -147,6 +153,10 @@
     $('planta').innerHTML = svg;
   }
   $('planta').addEventListener('click', function (ev) { const g = ev.target.closest('.pl-u'); if (g) escolher(parseInt(g.dataset.pos, 10)); });
+  $('planta').addEventListener('dblclick', function (ev) {          // dois cliques na planta: entra no apto
+    const g = ev.target.closest('.pl-u'); if (!g) return;
+    const p = parseInt(g.dataset.pos, 10); escolher(p); entrarApto(info(state.torre, state.andar, p));
+  });
   $('planta').addEventListener('keydown', function (ev) {
     const g = ev.target.closest && ev.target.closest('.pl-u');
     if (g && (ev.key === 'Enter' || ev.key === ' ')) { ev.preventDefault(); escolher(parseInt(g.dataset.pos, 10)); }
@@ -186,86 +196,92 @@
         '<button class="btn btn-ink" type="button" id="btnTour">Ver por dentro em 3D</button>' +
         '<button class="btn btn-gold" type="button" id="btnInteresse"' + (pode ? '' : ' disabled') + '>' + (u.status === 'reservado' ? 'Entrar na fila' : 'Tenho interesse') + '</button>' +
       '</div>' +
-      '<p class="unit-note">A visita abre com a vista da janela do ' + u.andar + 'º andar, a ' + num(u.altura, 1) + ' m do chão.</p>' +
+      '<p class="unit-note">A câmera entra no apto no lugar dele no bloco, a ' + num(u.altura, 1) + ' m do chão. Dois cliques no apê fazem o mesmo; pela porta de entrada você sai no corredor.</p>' +
       (pode ? '' : '<p class="unit-note">Este apartamento já foi vendido. Os disponíveis aparecem em verde.</p>');
     const bt = $('btnTour'); if (bt) bt.addEventListener('click', function () { entrarApto(u); });
     const bi = $('btnInteresse'); if (bi) bi.addEventListener('click', function () { atualizarMensagem(true); $('interesse').scrollIntoView({ behavior: 'smooth' }); $('msgNome').focus({ preventScroll: true }); });
   }
 
-  /* ---------- visita ao apartamento: no mesmo palco do prédio ----------
-     O prédio aproxima a câmera do apto escolhido, uma cortina com o número do apto cobre o palco
-     enquanto a maquete carrega e, quando ela avisa que está pronta, a cortina abre. O painel ao lado
-     passa a controlar a maquete (vistas, opções e cômodos) por mensagens. */
-  const explorer = $('explorar'), aptLayer = $('aptLayer'), curtain = $('curtain');
+  /* ---------- visita ao apartamento: a maquete abre no lugar do apto, dentro da cena do prédio ----------
+     Dois cliques no apto (no prédio, no número ou na planta) ou "Ver por dentro em 3D": a maquete completa substitui a miniatura,
+     a câmera sai de onde está e voa até o apartamento. A maquete desenha o prédio junto (mesma câmera), deixa sair pela porta
+     para o corredor do andar e, ao voltar, a câmera do prédio continua de onde a visita parou. O painel controla a maquete direto. */
+  const explorer = $('explorar');
   const reduce = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
-  let apto = null, aptoTimer = 0;
+  let apto = null;
   const VIEW_CMD = { '3d': 'v3d', top: 'vTop', walk: 'vVisit', free: 'vFree' };
-  function frame() { return $('aptFrame'); }
-  function enviar(msg) { const f = frame(); try { if (f && f.contentWindow) f.contentWindow.postMessage(msg, '*'); } catch (e) { /* maquete ainda carregando */ } }
   function mostrarView(id) { ['viewAndares', 'viewAndar', 'viewApto'].forEach(function (v) { $(v).hidden = v !== id; }); }
-  function cortina(on, titulo, sub, msg) {
-    if (titulo !== undefined) $('curtainTitle').textContent = titulo;
-    if (sub !== undefined) $('curtainSub').textContent = sub;
-    $('curtainMsg').textContent = msg || 'Entrando no apartamento…';
-    curtain.classList.toggle('is-open', !on);
+  function hudDom() {
+    const d = { app: $('aptHud'), stage: $('canvasBox'), labels: $('aptLabels'), crosshair: $('aptCross'), visitBar: $('aptVisit'), hudMode: $('aptMode'),
+      visitName: $('aptRoom'), standBtn: $('aptStand'), exitVisit: $('aptExitVisit'), hint: $('aptHint'), touch: $('aptTouch'), joy: $('aptJoy'),
+      knob: $('aptKnob'), updown: $('aptUpdown'), btnUp: $('aptUp'), btnDown: $('aptDown'), tip: $('aptTip') };
+    document.querySelectorAll('#viewApto [data-cmd]').forEach(function (b) { d[b.dataset.cmd] = b; });   // os botões do painel são os da maquete
+    return d;
   }
-  function entrarApto(u, tipo) {
-    const t = u ? u.tipo : tipo, T = DATA.tipos[t], andar = u ? u.andar : 5;
-    apto = { u: u, tipo: t, pronto: false };
-    const hash = '#embed=1&tipo=' + t + '&andar=' + andar + (u ? '&apto=' + u.num + '&torre=' + u.torre : '');
-    // painel
-    $('aptoTitulo').textContent = u ? 'Apto ' + u.num : 'Planta ' + T.nome.toLowerCase();
-    $('aptoSub').textContent = (u ? 'Torre ' + u.torre + ' · ' + u.andar + 'º andar · ' : '') + T.nome + ' · ' + num(T.area, 2) + ' m²';
-    $('voltarRotulo').textContent = u ? u.andar + 'º andar' : 'Prédio';
+  function avisoEntrada(txt) { $('aptEnteringTxt').textContent = txt || ''; $('aptEntering').hidden = !txt; }
+  function entrarApto(u) {
+    if (apto || !u) return;
+    if (!predio || !window.AptEngine) { avisoEntrada(''); return; }
+    if (state.andar !== u.andar || state.torre !== u.torre) return;
+    if (state.pos !== u.pos) escolher(u.pos);
+    const T = u.T;
+    apto = { u: u, engine: null, pronto: false };
+    $('aptoTitulo').textContent = 'Apto ' + u.num;
+    $('aptoSub').textContent = 'Torre ' + u.torre + ' · ' + u.andar + 'º andar · ' + T.nome + ' · ' + num(T.area, 2) + ' m²';
+    $('voltarRotulo').textContent = u.andar + 'º andar';
     $('aptoTotal').textContent = '—';
     $('aptoComodos').innerHTML = '<li class="unit-empty">Carregando os cômodos…</li>';
     mostrarView('viewApto');
-    // palco: aproxima a câmera do apto, fecha a cortina e carrega a maquete por trás dela
-    const titulo = u ? 'Apto ' + u.num : T.nome, sub = u ? 'Torre ' + u.torre + ' · ' + u.andar + 'º andar · ' + T.nome.toLowerCase() : 'Residencial Milão · ' + T.planta.toLowerCase();
-    cortina(true, titulo, sub);
-    curtain.classList.add('is-instant');
-    curtain.classList.remove('is-open');
-    explorer.classList.add('is-entering');
-    if (predio && u) predio.focusUnit(u.pos, reduce ? 0 : 900);
-    setTimeout(function () {
-      curtain.classList.remove('is-instant');
-      aptLayer.hidden = false;
-      explorer.classList.add('is-apto');
-      const fr = document.createElement('iframe');
-      fr.id = 'aptFrame'; fr.title = 'Apartamento ' + (u ? u.num : T.nome.toLowerCase()) + ' em 3D'; fr.setAttribute('allow', 'fullscreen');
-      fr.src = 'apartamento/index.html' + hash;
-      frame().replaceWith(fr);
-      clearTimeout(aptoTimer);
-      aptoTimer = setTimeout(function () { if (apto && !apto.pronto) abrirCortina(); }, 9000);
-    }, (predio && u && !reduce) ? 650 : 0);
+    explorer.classList.add('is-apto');
+    avisoEntrada('Entrando no apto ' + u.num + '…');
     if (window.innerWidth <= 980) $('canvasBox').scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
-  }
-  function abrirCortina() {
-    if (predio) predio.setPaused(true);
-    explorer.classList.remove('is-entering');
-    cortina(false);
+    // um quadro para o aviso aparecer antes de montar a maquete (leva um instante)
+    requestAnimationFrame(function () {
+      setTimeout(function () {
+        if (!apto || apto.u !== u) return;
+        let lugar = null;
+        try {
+          lugar = predio.enterUnit(u.pos);
+          if (!lugar) throw new Error('andar fechado');
+          lugar.renderWorld = predio.renderWith;
+          lugar.onView = function (v, forro) { predio.setAptView(v, forro); };
+          $('aptHud').hidden = false;
+          apto.engine = window.AptEngine.create({
+            tipo: u.tipo, andar: u.andar, apto: u.num, torre: u.torre, base: 'apartamento/',
+            integrated: lugar, renderer: predio.renderer, canvas: predio.canvas, dom: hudDom(), onMessage: mensagemApto
+          });
+        } catch (e) {
+          console.error(e);
+          $('aptHud').hidden = true;
+          if (lugar) predio.exitUnit(null);
+          apto = null;
+          explorer.classList.remove('is-apto');
+          mostrarView(state.andar ? 'viewAndar' : 'viewAndares');
+          avisoEntrada('A visita não abriu neste navegador.');
+          setTimeout(function () { avisoEntrada(''); }, 4000);
+        }
+      }, 30);
+    });
   }
   function sairApto() {
     if (!apto) return;
-    clearTimeout(aptoTimer);
-    cortina(true, undefined, undefined, 'Voltando ao prédio…');
-    setTimeout(function () {
-      const blank = document.createElement('iframe');
-      blank.id = 'aptFrame'; blank.title = 'Apartamento em 3D'; frame().replaceWith(blank);   // descarrega a maquete
-      aptLayer.hidden = true;
-      explorer.classList.remove('is-apto', 'is-entering');
-      if (predio) { predio.setPaused(false); if (state.andar) predio.selectFloor(state.torre, state.andar, true); else predio.home(); }
-      if (state.andar) { mostrarView('viewAndar'); if (state.pos) predio && predio.selectUnit(state.pos); } else mostrarView('viewAndares');
-      apto = null;
-    }, reduce ? 0 : 460);
+    const a = apto; apto = null;
+    let cam = null;
+    if (a.engine) {
+      try { cam = a.engine.worldCamera(); } catch (e) { cam = null; }
+      try { a.engine.dispose(); } catch (e) { console.error(e); }
+    }
+    $('aptHud').hidden = true; avisoEntrada('');
+    explorer.classList.remove('is-apto');
+    if (predio) predio.exitUnit(cam);
+    if (state.andar) { mostrarView('viewAndar'); if (state.pos && predio) predio.selectUnit(state.pos); } else mostrarView('viewAndares');
   }
   $('btnSairApto').addEventListener('click', sairApto);
-  document.querySelectorAll('#viewApto [data-cmd]').forEach(function (b) {
-    b.addEventListener('click', function () { enviar({ type: 'apt:cmd', id: b.dataset.cmd }); });
+  $('aptoComodos').addEventListener('click', function (ev) {
+    const b = ev.target.closest('[data-room]'); if (b && apto && apto.engine) apto.engine.room(b.dataset.room);
   });
-  $('aptoComodos').addEventListener('click', function (ev) { const b = ev.target.closest('[data-room]'); if (b) enviar({ type: 'apt:room', id: b.dataset.room }); });
   $('btnTelaCheia').addEventListener('click', function () {
-    const alvo = aptLayer;
+    const alvo = $('canvasBox');
     try {
       const req = alvo.requestFullscreen || alvo.webkitRequestFullscreen;
       if (req) { const r = req.call(alvo); if (r && r.catch) r.catch(function () { $('btnTelaCheia').textContent = 'Tela cheia indisponível aqui'; }); }
@@ -276,30 +292,29 @@
     if (apto && apto.u) { state.escolhido = apto.u; atualizarMensagem(true); }
     $('interesse').scrollIntoView({ behavior: reduce ? 'auto' : 'smooth' }); $('msgNome').focus({ preventScroll: true });
   });
-  window.addEventListener('message', function (ev) {
-    const f = frame();
-    if (!apto || !f || ev.source !== f.contentWindow) return;
-    const d = ev.data || {};
+  // avisos da maquete: pronta (lista de cômodos), estado da visita (vista, opções, cômodo atual) e erro
+  function mensagemApto(d) {
+    if (!apto || !d) return;
     if (d.type === 'apt:ready') {
       apto.pronto = true;
+      avisoEntrada('');
       $('aptoTotal').textContent = d.comodos + ' m²';
       $('aptoComodos').innerHTML = d.rooms.map(function (r) {
-        return '<li><button type="button" class="room-btn" data-room="' + esc(r.id) + '"><span class="rn">' + esc(r.name) + '</span><span class="ra">' + esc(r.area) + ' m²</span>' +
+        return '<li><button type="button" class="room-btn' + (r.id === 'corredor' ? ' is-corr' : '') + '" data-room="' + esc(r.id) + '"><span class="rn">' + esc(r.name) + '</span>' +
+          (r.area ? '<span class="ra">' + esc(r.area) + ' m²</span>' : '<span class="ra">fora do apto</span>') +
           (r.dims ? '<span class="rd">' + esc(r.dims) + ' m</span>' : '') + '</button></li>';
       }).join('');
-      setTimeout(abrirCortina, reduce ? 0 : 150);
     } else if (d.type === 'apt:state') {
       document.querySelectorAll('#viewApto .seg-btn').forEach(function (b) { b.setAttribute('aria-pressed', String(VIEW_CMD[d.view] === b.dataset.cmd)); });
-      const tg = { tRotate: d.rotate, tWalls: d.wallsLow, tFurn: d.furniture, tLabels: d.labels, tDoors: d.doorsOpen, tOverlay: d.overlay };
-      document.querySelectorAll('#viewApto .tgl').forEach(function (b) { b.setAttribute('aria-pressed', String(!!tg[b.dataset.cmd])); b.disabled = !!d.imm && (b.dataset.cmd === 'tRotate' || b.dataset.cmd === 'tWalls'); });
+      document.querySelectorAll('#viewApto .tgl').forEach(function (b) { b.disabled = !!d.imm && (b.dataset.cmd === 'tRotate' || b.dataset.cmd === 'tWalls'); });
       document.querySelectorAll('#aptoComodos .room-btn').forEach(function (b) { b.setAttribute('aria-current', String(!!d.imm && d.room === b.dataset.room)); });
       $('aptoDica').textContent = d.imm
-        ? 'Clique nas portas, luzes e interruptores, janelas e persianas, TVs, torneiras, chuveiro, fogão, privada, camas e sofá.'
-        : 'Toque num cômodo para entrar nele, ou em Visitar para andar pelo apartamento.';
+        ? 'Clique nas portas, luzes e interruptores, janelas e persianas, TVs, torneiras, chuveiro, fogão, privada, camas e sofá. A porta de entrada dá para o corredor.'
+        : 'Toque num cômodo para entrar nele, em Visitar para andar pelo apartamento ou em Voar para ver o prédio em volta.';
     } else if (d.type === 'apt:error') {
-      cortina(true, undefined, undefined, 'A maquete não abriu neste navegador. Ela precisa de WebGL.');
+      avisoEntrada('A maquete não abriu neste navegador. Ela precisa de WebGL.');
     }
-  });
+  }
 
   /* ---------- seções ---------- */
   (function renderSecoes() {
@@ -317,7 +332,7 @@
     $('cartoesPlantas').addEventListener('click', function (ev) {
       const b = ev.target.closest('[data-tour]'); if (!b) return;
       $('explorar').scrollIntoView({ behavior: 'smooth', block: 'start' });
-      entrarApto(null, b.dataset.tour);
+      visitarExemplo(b.dataset.tour);
     });
     $('acabamentos').innerHTML = DATA.acabamentos.map(function (a) { return '<li>' + esc(a) + '</li>'; }).join('');
 
@@ -356,6 +371,22 @@
     $('perto').innerHTML = DATA.referencias.map(function (r) { return '<li>' + esc(r) + '</li>'; }).join('');
     $('incorp').textContent = DATA.incorporacao;
   })();
+
+  // "Ver por dentro" de um tipo de planta: um apto disponível desse tipo, perto do 8º andar, na torre escolhida
+  function visitarExemplo(tipo) {
+    if (apto) sairApto();
+    const T = DATA.tipos[tipo]; let alvo = null;
+    for (let d = 0; d < DATA.andares && !alvo; d++) {
+      [8 + d, 8 - d].forEach(function (a) {
+        if (alvo || a < 1 || a > DATA.andares) return;
+        T.posicoes.forEach(function (p) { if (!alvo && statusOf(state.torre, a, p) === 'livre') alvo = { a: a, p: p }; });
+      });
+    }
+    if (!alvo) alvo = { a: 8, p: T.posicoes[0] };
+    if (state.andar !== alvo.a) abrirAndar(alvo.a, true);
+    escolher(alvo.p);
+    setTimeout(function () { entrarApto(info(state.torre, alvo.a, alvo.p)); }, reduce ? 0 : 1200);
+  }
 
   /* ---------- mensagem de interesse ---------- */
   let editada = false;
@@ -420,7 +451,8 @@
         statusOf: statusOf, typeOf: typeOf, colors: tokens, night: isDark(),
         onHover: showTip,
         onPickFloor: function (t, a) { if (apto) return; if (t !== state.torre) { state.torre = t; $('torreA').setAttribute('aria-pressed', t === 'A'); $('torreB').setAttribute('aria-pressed', t === 'B'); renderAndares(); } abrirAndar(a, true); showTip(null); },
-        onPickUnit: function (p) { escolher(p); },
+        onPickUnit: function (p) { if (!apto) escolher(p); },
+        onEnterUnit: function (p) { if (apto || !state.andar) return; escolher(p); entrarApto(info(state.torre, state.andar, p)); },
         onPickTower: function (t) { setTorre(t); }
       });
       requestAnimationFrame(function () { $('loading').classList.add('is-done'); });

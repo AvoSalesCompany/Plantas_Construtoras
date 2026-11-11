@@ -382,44 +382,55 @@ button, input, select, textarea { font: inherit; color: inherit; }
   font-size: 12.5px; font-weight: 650; pointer-events: none !important;
 }
 .apt-res i { width: 10px; height: 10px; border-radius: 50%; background: #FFB21F; animation: reservaPonto 1.4s ease-in-out infinite; }
-/* elevador: botão em frente às portas (andar) ou sob o pórtico da torre (térreo), menu dos andares e a viagem */
-.apt-lift { position: absolute; right: max(16px, env(safe-area-inset-right, 0px)); bottom: 62px; display: grid; justify-items: end; gap: 8px; }
-.apt-lift .btn::before {
-  content: ""; width: 14px; height: 14px; margin-right: 7px; flex: none;
-  background: currentColor;
-  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 14'%3E%3Cpath d='M7 0.5l4.6 5H2.4zM7 13.5l4.6-5H2.4z'/%3E%3C/svg%3E") center / contain no-repeat;
-  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 14'%3E%3Cpath d='M7 0.5l4.6 5H2.4zM7 13.5l4.6-5H2.4z'/%3E%3C/svg%3E") center / contain no-repeat;
+/* elevador: no hall, o botão de chamar com o mostrador do andar; dentro da cabine, o painel com T e 1 a 12, abrir e fechar */
+.apt-lift, .apt-cab {
+  position: absolute; right: max(16px, env(safe-area-inset-right, 0px)); bottom: 62px; display: grid; justify-items: center; gap: 8px;
+  padding: 12px; border-radius: 16px; color: #22262C;
+  background: linear-gradient(90deg, #C3C8CE, #ECEEF0 50%, #BFC4CA); border: 1px solid #9DA3AA; box-shadow: 0 10px 30px rgba(10, 14, 22, .28);
 }
-.apt-lift-menu {
-  display: grid; gap: 4px; min-width: 250px; max-width: calc(100vw - 48px); padding: 10px; border-radius: 14px;
-  background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow);
+.lift-disp {
+  display: flex; align-items: center; justify-content: center; gap: 6px; min-width: 92px; height: 44px; padding: 0 12px; border-radius: 8px;
+  background: #08090B; color: #FF5A3C; box-shadow: inset 0 0 0 1px rgba(255,255,255,.06);
 }
-.apt-lift-menu p { margin: 0 4px 4px; font-size: 10.5px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
-.apt-lift-menu button {
-  appearance: none; display: grid; grid-template-columns: 38px minmax(0, 1fr); align-items: center; gap: 10px; padding: 7px 8px; text-align: left;
-  border: 1px solid transparent; border-radius: 10px; background: transparent; color: var(--ink); cursor: pointer; font-size: 13.5px; font-weight: 600;
+.lift-disp span { font-size: 14px; width: 12px; text-align: center; }
+.lift-disp b { font-family: var(--f-num); font-size: 28px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1; letter-spacing: .02em; }
+.lift-call {
+  appearance: none; display: inline-flex; align-items: center; gap: 10px; padding: 6px 14px 6px 6px; border: 0; border-radius: 999px; cursor: pointer;
+  background: transparent; color: #22262C; font: 650 14px/1.2 var(--f-body);
 }
-.apt-lift-menu button b {
-  display: grid; place-items: center; width: 38px; height: 38px; border-radius: 50%; border: 1.5px solid var(--line);
-  font-family: var(--f-num); font-size: 15px; font-variant-numeric: tabular-nums;
+.lift-call i, .cab-keys button, .cab-door button {
+  display: grid; place-items: center; flex: none; width: 46px; height: 46px; border-radius: 50%;
+  background: radial-gradient(circle at 50% 40%, #FFFFFF, #E4E6E9 70%); border: 3px solid #C9CDD2; box-shadow: 0 0 0 2px #8E949B, 0 2px 4px rgba(0,0,0,.25);
+  color: #22262C; transition: border-color .15s ease, background .15s ease, box-shadow .15s ease;
 }
-.apt-lift-menu button:hover, .apt-lift-menu button:focus-visible { border-color: var(--gold); outline: none; }
-.apt-lift-menu button[aria-current="true"] b { background: var(--gold); border-color: var(--gold); color: var(--gold-ink); }
-.apt-ride {
-  position: absolute; inset: 0; z-index: 6; display: grid; place-items: center; background: rgba(8, 10, 16, .0);
-  transition: background-color .35s ease; pointer-events: auto;
+.lift-call i::before {
+  content: ""; width: 18px; height: 22px; background: currentColor;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 22'%3E%3Cpath d='M9 1l7 8H2zM9 21l7-8H2z'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 22'%3E%3Cpath d='M9 1l7 8H2zM9 21l7-8H2z'/%3E%3C/svg%3E") center / contain no-repeat;
 }
-.apt-ride.is-on { background: rgba(8, 10, 16, .9); }
-.apt-ride-box {
-  display: grid; justify-items: center; gap: 2px; padding: 18px 26px; border-radius: 14px; background: #0B0D10; color: #FF4436;
-  box-shadow: 0 0 0 1px rgba(255,255,255,.08), 0 10px 40px rgba(0,0,0,.5); opacity: 0; transform: translateY(6px);
-  transition: opacity .3s ease, transform .3s ease;
+.lift-call.is-on i, .cab-keys button[aria-pressed="true"] { background: radial-gradient(circle at 50% 40%, #FFF3D1, #FFD98A 75%); border-color: #FFB21F; color: #7A4B00; box-shadow: 0 0 0 2px #8E949B, 0 0 14px rgba(255, 178, 31, .65); }
+.lift-call:hover i, .lift-call:focus-visible i, .cab-keys button:hover, .cab-keys button:focus-visible, .cab-door button:hover, .cab-door button:focus-visible { border-color: var(--gold); outline: none; }
+.apt-lift small { min-height: 1em; font-size: 12px; font-weight: 600; color: #3A3F47; text-align: center; max-width: 210px; }
+.apt-lift small:empty { display: none; }
+.apt-cab p { margin: 0; font-size: 11.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #3A3F47; text-align: center; max-width: 140px; }
+.cab-keys { display: grid; grid-template-columns: repeat(2, 46px); gap: 8px 12px; }
+.cab-keys button { appearance: none; position: relative; cursor: pointer; padding: 0; font: 700 16px/1 var(--f-num); font-variant-numeric: tabular-nums; grid-row: var(--r2); grid-column: var(--c2); }
+.cab-keys button.is-t { grid-column: 1 / -1; justify-self: center; }
+.cab-keys button.is-apt::after { content: ""; position: absolute; top: -3px; right: -3px; width: 10px; height: 10px; border-radius: 50%; background: var(--navy, #22318A); box-shadow: 0 0 0 2px #ECEEF0; }
+.cab-keys button:disabled { cursor: default; opacity: .55; }
+.cab-door { display: flex; gap: 12px; padding-top: 4px; border-top: 1px solid rgba(0,0,0,.12); }
+.cab-door button { appearance: none; cursor: pointer; padding: 0; }
+.cab-door svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+/* celular ou tela baixa: quatro colunas (9 10 11 12 / 5 6 7 8 / 1 2 3 4 / T), botões menores */
+@media (max-width: 759px), (max-height: 640px) {
+  .apt-lift, .apt-cab { gap: 6px; padding: 9px; bottom: 58px; }
+  .cab-keys { grid-template-columns: repeat(4, 36px); gap: 6px 7px; }
+  .cab-keys button { grid-row: var(--r4); grid-column: var(--c4); }
+  .cab-keys button, .cab-door button, .lift-call i { width: 36px; height: 36px; font-size: 14px; }
+  .lift-disp { height: 34px; min-width: 76px; } .lift-disp b { font-size: 21px; }
+  .apt-cab p { max-width: 170px; font-size: 10.5px; }
 }
-.apt-ride.is-on .apt-ride-box { opacity: 1; transform: none; }
-.apt-ride-arrow { font-size: 18px; line-height: 1; }
-.apt-ride-box strong { font-family: var(--f-num); font-size: 56px; line-height: 1.05; font-variant-numeric: tabular-nums; }
-.apt-ride-box small { color: #E9E4DA; font-size: 12.5px; font-weight: 600; letter-spacing: .04em; }
-@media (prefers-reduced-motion: reduce) { .apt-ride, .apt-ride-box { transition: none; } .apt-res i { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .apt-res i { animation: none; } .lift-call i, .cab-keys button { transition: none; } }
 @media (max-width: 759px) { .apt-res { top: auto; bottom: 62px; left: max(16px, env(safe-area-inset-left, 0px)); right: auto; } }
 .canvas-box:has(.apt-hud.is-immersive) #predio { cursor: crosshair; }
 .canvas-box:has(.apt-hud.is-locked) #predio { cursor: none; }

@@ -80,11 +80,18 @@
           <div class="apt-tip" id="aptTip" hidden></div>
           <p class="apt-res" id="aptRes" hidden><i aria-hidden="true"></i>Apto reservado · as luzes piscam</p>
           <div class="apt-lift" id="aptLift" hidden>
-            <button class="btn btn-gold btn-sm" id="aptLiftBtn" type="button">Chamar o elevador</button>
-            <div class="apt-lift-menu" id="aptLiftMenu" hidden></div>
+            <div class="lift-disp" aria-hidden="true"><span id="aptLiftArrow"></span><b id="aptLiftFloor">T</b></div>
+            <button class="lift-call" id="aptLiftBtn" type="button"><i aria-hidden="true"></i><span>Chamar o elevador</span></button>
+            <small id="aptLiftTxt" aria-live="polite"></small>
           </div>
-          <div class="apt-ride" id="aptRide" hidden aria-live="polite">
-            <div class="apt-ride-box"><span class="apt-ride-arrow" id="aptRideArrow">▼</span><strong id="aptRideFloor">8</strong><small id="aptRideTxt">Descendo</small></div>
+          <div class="apt-cab" id="aptCab" hidden role="group" aria-label="Painel do elevador">
+            <div class="lift-disp" aria-hidden="true"><span id="aptCabArrow"></span><b id="aptCabFloor">T</b></div>
+            <p id="aptCabTxt" aria-live="polite">Escolha o andar</p>
+            <div class="cab-keys" id="aptCabKeys"></div>
+            <div class="cab-door">
+              <button type="button" data-lift="open" aria-label="Abrir a porta"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 6 4 12l6 6M14 6l6 6-6 6M12 4v16"/></svg></button>
+              <button type="button" data-lift="close" aria-label="Fechar a porta"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6l6 6-6 6M20 6l-6 6 6 6M12 4v16"/></svg></button>
+            </div>
           </div>
         </div>
         <p class="apt-entering" id="aptEntering" hidden aria-live="polite"><span id="aptEnteringTxt">Entrando no apartamento…</span></p>

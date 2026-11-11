@@ -2440,33 +2440,62 @@
     /* ---------------- elevador e térreo do condomínio ----------------
        O elevador do hall leva ao térreo: o visitante sai pela portaria da torre e anda pelo condomínio (piscina, salão,
        quiosques, pracinha, espaço pet, portaria), com a colisão do térreo; pela entrada da torre, volta ao andar. */
-    let level = 'apt';                                 // 'apt': apto e corredor do andar; 'ground': térreo do condomínio
+    // nível do visitante: 'apt' (apto e corredor do andar dele), 'floor' (corredor de outro andar), 'ground' (térreo do condomínio),
+    // 'lift' (dentro da cabine, com as portas fechadas, andando)
+    let level = 'apt', visitFloor = APT_FLOOR;
+    const rectL = function (r) {
+      const a = new THREE.Vector3(r[0], 0, r[1]).applyMatrix4(UINV), b = new THREE.Vector3(r[2], 0, r[3]).applyMatrix4(UINV);
+      return [Math.min(a.x, b.x), Math.min(a.z, b.z), Math.max(a.x, b.x), Math.max(a.z, b.z)];
+    };
+    const boxL = function (r) { const q = rectL(r); return { x0: q[0], x1: q[2], z0: q[1], z1: q[3], k: 'arch' }; };
+    const vL = function (v) { return new THREE.Vector3().fromArray(v).applyMatrix4(UINV); };
     const GROUND = INTEG && INTEG.ground ? (function () {
-      const rectL = function (r) {
-        const a = new THREE.Vector3(r[0], 0, r[1]).applyMatrix4(UINV), b = new THREE.Vector3(r[2], 0, r[3]).applyMatrix4(UINV);
-        return [Math.min(a.x, b.x), Math.min(a.z, b.z), Math.max(a.x, b.x), Math.max(a.z, b.z)];
-      };
-      const vL = function (v) { return new THREE.Vector3().fromArray(v).applyMatrix4(UINV); };
       const G = INTEG.ground;
       return {
-        boxes: (G.walls || []).map(function (r) { const q = rectL(r); return { x0: q[0], x1: q[2], z0: q[1], z1: q[3], k: 'arch' }; }),
+        boxes: (G.walls || []).map(boxL),
         walk: (G.walk || []).map(rectL),
         zones: (G.zones || []).map(function (z) { return { id: z.id, name: z.name, area: '', dims: '', q: rectL(z.r) }; }),
         yard: { id: 'terreo', name: G.name || 'Térreo do condomínio', area: '', dims: '' },
-        spawn: { at: vL(G.spawn.at), to: vL(G.spawn.to) },
-        lift: rectL(G.lift)
+        spawn: { at: vL(G.spawn.at), to: vL(G.spawn.to) }
       };
     })() : null;
-    const LIFT = INTEG && INTEG.lift ? (function () {
-      const a = new THREE.Vector3(INTEG.lift.zone[0], 0, INTEG.lift.zone[1]).applyMatrix4(UINV), b = new THREE.Vector3(INTEG.lift.zone[2], 0, INTEG.lift.zone[3]).applyMatrix4(UINV);
-      return { q: [Math.min(a.x, b.x), Math.min(a.z, b.z), Math.max(a.x, b.x), Math.max(a.z, b.z)],
-        at: new THREE.Vector3().fromArray(INTEG.lift.at).applyMatrix4(UINV), to: new THREE.Vector3().fromArray(INTEG.lift.to).applyMatrix4(UINV) };
+    // elevador: cabine, paredes, portas (a da frente abre nos andares, a de trás no térreo), halls onde se chama, corredor dos outros andares
+    const ELV = INTEG && INTEG.elevator && GROUND ? (function () {
+      const E = INTEG.elevator;
+      return {
+        E: E, cab: rectL(E.cab), walls: E.walls.map(boxL), front: boxL(E.front), rear: boxL(E.rear),
+        hall: rectL(E.hall), lobby: rectL(E.lobby), doorFront: rectL(E.doorFront), doorRear: rectL(E.doorRear),
+        floorBoxes: E.floorWalls.map(boxL), hallSpot: { at: vL(E.hallSpot.at), to: vL(E.hallSpot.to) },
+        localY: function (n) { return E.stopY[n] - INTEG.floorY; },
+        room: { id: 'elevador', name: 'Elevador · Torre ' + E.tower, area: '', dims: '' },
+        floorRoom: { id: 'andar', name: '', area: '', dims: '' }
+      };
     })() : null;
     const inQ = function (q, x, z) { return x >= q[0] && x <= q[2] && z >= q[1] && z <= q[3]; };
-    function baseY() { return level === 'ground' ? GROUND_Y : 0; }
+    const lift = ELV ? { at: 0, y: ELV.localY(0), phase: 'idle', door: 0, target: null, call: false, from: 0, to: 0, t: 0, dur: 1, y0: 0, y1: 0, hold: 0, dir: 0, shown: 0, rider: false, turn: null, sig: '', hud: '' } : null;
+    const LIFT_BOXES = [];
+    const CAB_WALK = ELV ? [ELV.cab] : [];
+    const FLOOR_WALK = ELV ? WALK.slice(1).concat([ELV.cab, ELV.doorFront]) : [];
+    if (ELV) { WALK.push(ELV.cab, ELV.doorFront); setTimeout(function () { refreshLiftBoxes(); }, 0); }
+    function playerFloor() { return level === 'ground' ? 0 : level === 'floor' ? visitFloor : level === 'apt' ? APT_FLOOR : null; }
+    // paredes da cabine e as portas fechadas (a porta só deixa passar aberta, com a cabine parada no andar do visitante)
+    function refreshLiftBoxes() {
+      if (!ELV) return;
+      LIFT_BOXES.length = 0;
+      ELV.walls.forEach(function (b) { LIFT_BOXES.push(b); });
+      const pf = playerFloor(), open = lift.door > 0.8 && lift.at !== null && lift.at === pf && level !== 'lift';
+      if (!(open && pf > 0)) LIFT_BOXES.push(ELV.front);
+      if (!(open && pf === 0)) LIFT_BOXES.push(ELV.rear);
+    }
+    function baseY() {
+      if (level === 'ground') return GROUND_Y;
+      if (level === 'floor' && ELV) return ELV.localY(visitFloor) + 0.012;
+      if (level === 'lift' && lift) return lift.y;
+      return 0;
+    }
     // rede de segurança: o centro do visitante fica dentro do apto ou do corredor (as paredes já seguram o corpo dele)
     function clampWalk(p, r) {
-      const list = level === 'ground' && GROUND ? GROUND.walk : WALK;
+      const list = level === 'ground' && GROUND ? GROUND.walk : level === 'floor' ? FLOOR_WALK : level === 'lift' ? CAB_WALK : WALK;
       if (list === WALK && WALK.length === 1) { p.x = clamp(p.x, -CX + r, CX - r); p.z = clamp(p.z, -CZ + r, CZ - r); return; }
       let bx = p.x, bz = p.z, bd = Infinity;
       for (let i = 0; i < list.length; i++) {
@@ -2689,14 +2718,22 @@
       const k = (rr - d) / d; p.x += dx * k; p.z += dz * k;
       return true;
     }
+    function outerBoxes() { return level === 'ground' && GROUND ? GROUND.boxes : level === 'floor' && ELV ? ELV.floorBoxes : null; }
     function collide(p, r) {
       const furn = state.furniture;
-      if (level === 'ground' && GROUND) {
-        for (let it = 0; it < 6; it++) { let hit = false; for (let i = 0; i < GROUND.boxes.length; i++) if (pushBox(p, r, GROUND.boxes[i])) hit = true; if (!hit) break; }
+      if (level !== 'apt') {
+        const list = outerBoxes();
+        for (let it = 0; it < 6; it++) {
+          let hit = false;
+          if (list) for (let i = 0; i < list.length; i++) if (pushBox(p, r, list[i])) hit = true;
+          for (let i = 0; i < LIFT_BOXES.length; i++) if (pushBox(p, r, LIFT_BOXES[i])) hit = true;
+          if (!hit) break;
+        }
         clampWalk(p, r); return;
       }
       for (let it = 0; it < 6; it++) {
         let hit = false;
+        for (let i = 0; i < LIFT_BOXES.length; i++) if (pushBox(p, r, LIFT_BOXES[i])) hit = true;
         for (let i = 0; i < staticBoxes.length; i++) { const b = staticBoxes[i]; if (b.k === 'furn' && !furn) continue; if (pushBox(p, r, b)) hit = true; }
         if (furn) for (let i = 0; i < sliders.length; i++) if (sliders[i].box && pushBox(p, r, sliders[i].box())) hit = true;
         for (let i = 0; i < archBlocks.length; i++) if (pushBox(p, r, archBlocks[i]())) hit = true;
@@ -2714,7 +2751,8 @@
         const pen = (p.x > b.x0 && p.x < b.x1 && p.z > b.z0 && p.z < b.z1) ? r + 0.1 : r - Math.hypot(p.x - cx, p.z - cz);
         if (pen > worst) worst = pen;
       };
-      if (level === 'ground' && GROUND) { GROUND.boxes.forEach(chk); return worst; }
+      LIFT_BOXES.forEach(chk);
+      if (level !== 'apt') { const list = outerBoxes(); if (list) list.forEach(chk); return worst; }
       for (let i = 0; i < staticBoxes.length; i++) { const b = staticBoxes[i]; if (b.k === 'furn' && !furn) continue; chk(b); }
       if (furn) sliders.forEach(function (sl) { if (sl.box) chk(sl.box()); });
       archBlocks.forEach(function (f) { chk(f()); });
@@ -2788,6 +2826,7 @@
     }
     function leaveImmersive() {
       if (locked && document.exitPointerLock) { try { document.exitPointerLock(); } catch (e) { /* já solto */ } }
+      if (lift) lift.rider = false;
       setLevel('apt');
       ceilGroup.visible = false; keys.clear(); upHeld = 0; downHeld = 0; joy.x = 0; joy.y = 0; joy.id = null;
       player.pose = null; player.target = null; ptween = null; currentRoom = null; hideTip();
@@ -2807,6 +2846,8 @@
       flyTo(p.pos, p.target, p.fov, 1000, function () { settleOutside(p.target); });
     }
     function roomAt(x, z) {
+      if (ELV && (level === 'lift' || inQ(ELV.cab, x, z))) return ELV.room;
+      if (level === 'floor' && ELV) { ELV.floorRoom.name = 'Corredor do ' + visitFloor + 'º andar'; return ELV.floorRoom; }
       if (level === 'ground' && GROUND) {
         const zn = GROUND.zones.find(function (q) { return inQ(q.q, x, z); });
         return zn || GROUND.yard;
@@ -2853,14 +2894,15 @@
         }
         setLevel(prev);
       }
-      if (level === 'ground') { liftArrive('terreo'); return; }
+      if (level === 'ground') { teleport('terreo'); return; }
+      if (level === 'floor' || level === 'lift') { teleport('hall'); return; }
       if (!roomAt(x, z) || isBlocked(x, z)) { enterWalk(currentRoom ? currentRoom.id : 'circ'); return; }
       view = 'walk'; player.vel.set(0, 0, 0); currentRoom = roomAt(x, z);
       tweenPlayer(new THREE.Vector3(x, EYE, z), player.yaw, clamp(player.pitch, -0.5, 0.5), 650, null);
       syncUI(); focusCanvas();
     }
     function enterFree() {
-      if (view === 'free') return;
+      if (view === 'free' || level === 'lift') return;
       const fromOutside = !immersive();
       beginImmersive();
       view = 'free'; camera.near = 0.04; camera.updateProjectionMatrix();
@@ -2874,29 +2916,33 @@
       syncUI(); focusCanvas(); autoLock();
     }
     function setRotate(on) { controls.autoRotate = !!on; syncUI(); }
-    // troca de nível: no térreo a maquete do apto some (o prédio inteiro aparece no lugar do andar aberto)
-    function setLevel(lv) {
-      if (lv === level) return;
+    // troca de nível: fora do andar do apto a maquete some (o prédio inteiro aparece no lugar do andar aberto)
+    function setLevel(lv, floor) {
+      if (lv === 'floor') visitFloor = floor || visitFloor;
+      const changed = lv !== level;
       level = lv;
-      root.visible = lv !== 'ground';
-      dirtyShadows(); notifyView();
+      root.visible = lv === 'apt';
+      refreshLiftBoxes();
+      if (changed) { dirtyShadows(); notifyView(); } else if (lv === 'floor') notifyView();
     }
-    // onde o visitante está em relação ao elevador: 'andar' (hall do andar), 'terreo' (portaria da torre) ou nada
+    // onde o visitante está em relação ao elevador: 'hall' (em frente às portas no andar), 'lobby' (hall de entrada no térreo), 'cab' (dentro)
     function liftSpot() {
-      if (view !== 'walk' || player.pose) return null;
-      if (level === 'ground') return GROUND && inQ(GROUND.lift, player.pos.x, player.pos.z) ? 'terreo' : null;
-      return LIFT && inQ(LIFT.q, player.pos.x, player.pos.z) ? 'andar' : null;
+      if (!ELV || view !== 'walk' || player.pose) return null;
+      const x = player.pos.x, z = player.pos.z;
+      if (level === 'lift' || inQ(ELV.cab, x, z)) return 'cab';
+      if (level === 'ground') return inQ(ELV.lobby, x, z) ? 'lobby' : null;
+      return inQ(ELV.hall, x, z) ? 'hall' : null;
     }
-    // chegada do elevador: no térreo, saindo da portaria da torre; no andar, de frente para o corredor
-    function liftArrive(dest) {
-      if (dest === 'terreo' && !GROUND) return;
-      if (dest !== 'terreo' && !LIFT) return;
+    // atalhos da lista: 'terreo' (sai na frente da torre, no térreo) e 'hall' (hall dos elevadores do andar do apto, de frente para as portas)
+    function teleport(dest) {
+      if (dest === 'terreo' ? !GROUND : !ELV) return;
       if (!immersive()) beginImmersive();
       tween = null; ptween = null; player.target = null; player.pose = null; player.vel.set(0, 0, 0);
+      if (lift) lift.rider = false;
       setLevel(dest === 'terreo' ? 'ground' : 'apt');
       view = 'walk'; camera.near = 0.04; camera.fov = 70; camera.updateProjectionMatrix();
-      const at = dest === 'terreo' ? GROUND.spawn.at.clone() : LIFT.at.clone(), to = dest === 'terreo' ? GROUND.spawn.to.clone() : LIFT.to.clone();
-      at.y = baseY() + EYE; to.y = baseY() + EYE - 0.3;
+      const at = dest === 'terreo' ? GROUND.spawn.at.clone() : ELV.hallSpot.at.clone(), to = dest === 'terreo' ? GROUND.spawn.to.clone() : ELV.hallSpot.to.clone();
+      at.y = baseY() + EYE; to.y = baseY() + EYE - 0.25;
       const dir = to.sub(at).normalize();
       player.yaw = Math.atan2(dir.x, dir.z); player.pitch = Math.asin(clamp(dir.y, -1, 1));
       player.pos.copy(at);
@@ -2904,6 +2950,130 @@
       currentRoom = roomAt(at.x, at.z);
       camera.position.copy(player.pos); camera.lookAt(tmpV.copy(player.pos).add(lookDir()));
       syncUI(); focusCanvas(); markDirty();
+    }
+
+    /* ---------------- elevador: chamar no hall, porta abre, entrar, escolher o andar no painel (T, 1 a 12) ----------------
+       A cabine anda de verdade (o visitante vai junto, de pé), o mostrador conta os andares e a porta abre no destino:
+       no andar do apto, no corredor de outro andar (portas dos vizinhos fechadas) ou no hall de entrada do térreo. */
+    const DOOR_S = 1.15;
+    const easeIO = function (k) { return k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2; };
+    function cabCenter() { return new THREE.Vector3((ELV.cab[0] + ELV.cab[2]) / 2, 0, (ELV.cab[1] + ELV.cab[3]) / 2); }
+    function inCabDeep() { const m = 0.18, c = ELV.cab; return player.pos.x > c[0] + m && player.pos.x < c[2] - m && player.pos.z > c[1] + m && player.pos.z < c[3] - m; }
+    function inCab() { return inQ(ELV.cab, player.pos.x, player.pos.z); }
+    // alguém parado na porta (o sensor reabre): na faixa entre o hall e o fundo da cabine junto à porta que está abrindo
+    function doorBlocked() {
+      const pf = playerFloor(); if (pf === null || pf !== lift.at || view !== 'walk') return false;
+      const q = pf === 0 ? ELV.doorRear : ELV.doorFront;
+      return inQ(q, player.pos.x, player.pos.z) && !inCabDeep();
+    }
+    // direção (no mundo) para a qual a porta da parada abre: térreo +z (hall de entrada), andares -z (corredor)
+    function yawToward(worldZ) { const d = new THREE.Vector3(0, 0, worldZ).transformDirection(UINV); return Math.atan2(d.x, d.z); }
+    function liftCmd(cmd) {
+      if (!lift) return;
+      const now = performance.now(), pf = playerFloor();
+      if (cmd === 'call') {
+        if (pf === null) return;
+        if (lift.at === pf && lift.phase !== 'moving') { if (lift.phase === 'open') lift.hold = now + 7000; else if (lift.phase !== 'opening') lift.phase = 'opening'; }
+        else if (lift.phase === 'idle' || lift.phase === 'open' || lift.phase === 'closing') {
+          lift.call = true; lift.phase = 'coming'; lift.door = 0;
+          lift.from = lift.at === null ? lift.shown : lift.at; lift.to = pf; lift.t = 0;
+          lift.dur = reduceMotion ? 0.4 : Math.min(5, 1.2 + 0.32 * Math.abs(lift.to - lift.from));
+          lift.y0 = ELV.localY(lift.from); lift.y1 = ELV.localY(lift.to); lift.dir = lift.to > lift.from ? 1 : -1; lift.at = null;
+        } else lift.call = true;
+      } else if (cmd === 'open') {
+        if (lift.at !== null && lift.at === pf && lift.phase !== 'moving') { if (lift.phase === 'open') lift.hold = now + 7000; else lift.phase = 'opening'; }
+      } else if (cmd === 'close') {
+        if (lift.phase === 'open') lift.hold = 0;
+      } else if (typeof cmd === 'number' && cmd >= 0 && cmd <= ELV.E.floors) {
+        if (!inCab() || lift.phase === 'moving' || lift.phase === 'coming') return;
+        if (cmd === lift.at) { if (lift.phase !== 'open') lift.phase = 'opening'; else lift.hold = now + 7000; lift.target = null; return; }
+        lift.target = cmd;
+        // o visitante dá um passo para o meio da cabine, virado para a porta, e a porta fecha
+        const c = cabCenter(), yaw = yawToward(lift.at === 0 ? 1 : -1);
+        if (view === 'walk' && !player.pose) tweenPlayer(new THREE.Vector3(c.x, player.pos.y, c.z), yaw, -0.05, 450, null);
+        if (lift.phase === 'open') lift.hold = 0;
+        else if (lift.phase === 'idle') startRide();
+      }
+      pushLift(true);
+    }
+    function startRide() {
+      lift.phase = 'moving'; lift.from = lift.at; lift.to = lift.target; lift.t = 0; lift.door = 0;
+      lift.dur = reduceMotion ? 0.6 : 1.8 + 0.42 * Math.abs(lift.to - lift.from);
+      lift.y0 = ELV.localY(lift.from); lift.y1 = ELV.localY(lift.to); lift.y = lift.y0;
+      lift.dir = lift.to > lift.from ? 1 : -1; lift.at = null; lift.rider = view === 'walk';
+      if (lift.rider) setLevel('lift');
+      try { ELV.E.prepare(lift.to); } catch (e) { console.error(e); }
+      // vira para a porta que vai abrir (a de trás, no térreo), se estiver de costas para ela
+      const want = yawToward(lift.to === 0 ? 1 : -1);
+      lift.turn = Math.abs(angDiff(player.yaw, want)) > 1.3 ? want : null;
+    }
+    function arrive() {
+      lift.at = lift.to; lift.target = null; lift.dir = 0; lift.y = lift.y1; lift.shown = lift.at; lift.turn = null;
+      if (lift.rider) {
+        const n = lift.at;
+        if (n === 0) setLevel('ground'); else if (n === APT_FLOOR) setLevel('apt'); else setLevel('floor', n);
+        player.pos.y = baseY() + EYE; ceilGroup.visible = level === 'apt';
+        currentRoom = roomAt(player.pos.x, player.pos.z);
+        lift.rider = false;
+      }
+      lift.phase = 'opening';
+    }
+    function stepLift(dt, now) {
+      if (!lift) return false;
+      let moving = false;
+      const ph = lift.phase;
+      if (ph === 'coming' || ph === 'moving') {
+        lift.t += dt;
+        const k = Math.min(1, lift.t / lift.dur), e = easeIO(k);
+        lift.y = lift.y0 + (lift.y1 - lift.y0) * e;
+        lift.shown = Math.round(lift.from + (lift.to - lift.from) * e);
+        if (ph === 'moving' && lift.rider) {
+          if (lift.turn !== null && k > 0.25) player.yaw += angDiff(player.yaw, lift.turn) * Math.min(1, dt * 2.2);
+          if (!player.pose && !ptween) player.pos.y = lift.y + EYE;
+        }
+        if (k >= 1) { if (ph === 'coming') { lift.at = lift.to; lift.shown = lift.at; lift.call = false; lift.dir = 0; lift.phase = 'opening'; } else arrive(); }
+        moving = true;
+      } else if (ph === 'opening') {
+        lift.door = Math.min(1, lift.door + dt / DOOR_S); moving = true;
+        if (lift.door >= 1) { lift.phase = 'open'; lift.hold = now + 7000; }
+      } else if (ph === 'open') {
+        if ((lift.target !== null && lift.target !== lift.at) || now > lift.hold) { if (!doorBlocked()) lift.phase = 'closing'; else lift.hold = now + 1500; }
+      } else if (ph === 'closing') {
+        if (doorBlocked()) lift.phase = 'opening';
+        else {
+          lift.door = Math.max(0, lift.door - dt / DOOR_S); moving = true;
+          if (lift.door <= 0) {
+            if (lift.target !== null && lift.target !== lift.at && inCab()) startRide();
+            else { lift.phase = 'idle'; lift.target = null; }
+          }
+        }
+      }
+      pushLift(false);
+      return moving;
+    }
+    // manda o estado para o prédio desenhar (portas, cabine, mostradores, botões) e para o painel do site
+    function pushLift(force) {
+      const pf = playerFloor(), shownTxt = lift.shown ? String(lift.shown) : 'T';
+      const sig = [lift.at, lift.y.toFixed(3), lift.door.toFixed(3), shownTxt, lift.dir, lift.target, lift.call, level, pf].join('|');
+      if (force || sig !== lift.sig) {
+        lift.sig = sig;
+        refreshLiftBoxes();
+        try { ELV.E.update({ at: lift.at, y: lift.y + INTEG.floorY, door: easeIO(lift.door), shown: shownTxt, dir: lift.dir, sel: lift.target, call: lift.call, level: level, floor: pf }); } catch (e) { console.error(e); }
+        markDirty();
+      }
+      const spot = liftSpot();
+      const hud = [spot, lift.phase, shownTxt, lift.dir, lift.target, lift.call, lift.at === pf].join('|');
+      if (hud !== lift.hud) {
+        lift.hud = hud;
+        postParent({ type: 'apt:lift', spot: spot, phase: lift.phase, shown: shownTxt, dir: lift.dir, sel: lift.target, call: lift.call, here: lift.at !== null && lift.at === pf,
+          floor: pf, apt: APT_FLOOR, floors: ELV.E.floors, tower: ELV.E.tower });
+      }
+    }
+    // botões do elevador na mira (o prédio diz qual): vira um objeto clicável como os do apto
+    const LIFT_LABEL = { call: 'Chamar o elevador', open: 'Abrir a porta', close: 'Fechar a porta', panel: 'Painel do elevador' };
+    function liftInter(w) {
+      return { label: function () { return w.id === 'floor' ? (w.n ? 'Ir para o ' + w.n + 'º andar' : 'Ir para o térreo') : LIFT_LABEL[w.id]; },
+        act: function () { if (w.id === 'floor') liftCmd(w.n); else if (w.id !== 'panel') liftCmd(w.id); } };
     }
     function setWallsLow(low) { state.wallsLow = low; buildArchitecture(low ? H_LOW : H_HIGH); syncUI(); }
 
@@ -3072,7 +3242,7 @@
       if (opts.onMessage) { try { opts.onMessage(msg); } catch (e) { console.error(e); } return; }
       try { if (window.parent && window.parent !== window) window.parent.postMessage(msg, '*'); } catch (e) { /* sem site em volta */ }
     }
-    function notifyView() { if (INTEG && INTEG.onView) { try { INTEG.onView(view, ceilGroup.visible, level); } catch (e) { console.error(e); } } }
+    function notifyView() { if (INTEG && INTEG.onView) { try { INTEG.onView(view, ceilGroup.visible, level, visitFloor); } catch (e) { console.error(e); } } }
     // comandos vindos do painel do site: os mesmos botões da maquete, entrar num cômodo ou voltar à vista 3D
     on(window, 'message', function (e) {
       if (!EMBED || e.source !== window.parent) return;
@@ -3109,14 +3279,18 @@
       const rect = canvas.getBoundingClientRect();
       ndc.set(((cx - rect.left) / rect.width) * 2 - 1, -((cy - rect.top) / rect.height) * 2 + 1);
       raycaster.setFromCamera(ndc, camW || camera);
-      const hits = raycaster.intersectObjects(pickRoots, true);
+      const hits = root.visible ? raycaster.intersectObjects(pickRoots, true) : [];
+      // botões do elevador (no prédio): valem se estiverem mais perto que o que o apto tem na frente
+      const w = ELV && immersive() ? ELV.E.pick(raycaster) : null;
       for (let i = 0; i < hits.length; i++) {
         const h = hits[i], o = h.object;
         if (o.userData.noPick || !visibleChain(o)) continue;
+        if (w && w.distance < h.distance) break;
         if (UINV) h.point.applyMatrix4(UINV);                     // ponto de volta para as coordenadas da planta
         let q = o; while (q && !q.userData.inter) q = q.parent;
         return { hit: h, inter: q ? q.userData.inter : null };
       }
+      if (w) return { hit: { distance: w.distance, point: new THREE.Vector3(), object: { userData: {} } }, inter: liftInter(w) };
       return null;
     }
     function showTip(text, x, y) {
@@ -3382,16 +3556,21 @@
       camW.fov = camera.fov; camW.aspect = camera.aspect; camW.near = camera.near; camW.far = camera.far;
       camW.updateProjectionMatrix(); camW.updateMatrixWorld();
     }
-    function renderAll() {
-      if (!INTEG) { renderer.render(scene, camera); return; }
+    // devolve true quando o mundo pede outro quadro (porta de vidro abrindo, água da piscina)
+    function renderAll(moving) {
+      if (!INTEG) { renderer.render(scene, camera); return false; }
       syncWorldCam();
       const aptShadows = renderer.shadowMap.needsUpdate;
-      if (INTEG.renderWorld) INTEG.renderWorld(camW);
-      renderer.autoClear = false;
-      renderer.toneMappingExposure = 1.0;
-      renderer.shadowMap.needsUpdate = aptShadows;
-      renderer.render(scene, camW);
-      renderer.autoClear = true;
+      let busy = false;
+      if (INTEG.renderWorld) busy = !!INTEG.renderWorld(camW, moving);
+      if (root.visible) {                                      // fora do andar do apto a maquete nem é desenhada
+        renderer.autoClear = false;
+        renderer.toneMappingExposure = 1.0;
+        renderer.shadowMap.needsUpdate = aptShadows;
+        renderer.render(scene, camW);
+        renderer.autoClear = true;
+      }
+      return busy;
     }
     if (U) scene.updateMatrixWorld(true);
 
@@ -3422,13 +3601,13 @@
       rafId = requestAnimationFrame(frame);
       try {
         now = now || performance.now();
-        const dt = Math.min(0.05, Math.max(0, (now - last) / 1000)); last = now;
+        const dt = Math.min(0.05, Math.max(0, (now - last) / 1000)) * (dbg && dbg.timeScale || 1); last = now;
         if (tween) stepTween(now);
         else if (immersive()) {
           if (stepPlayer(dt, now)) markDirty();
           camera.position.copy(player.pos);
           camera.lookAt(tmpV.copy(player.pos).add(lookDir()));
-          const ceilOn = level !== 'ground' && (view === 'walk' || player.pos.y < H_HIGH - 0.03);
+          const ceilOn = level === 'apt' && (view === 'walk' || player.pos.y < H_HIGH - 0.03);
           if (ceilGroup.visible !== ceilOn) { ceilGroup.visible = ceilOn; markDirty(); }
           const ls = liftSpot();
           if (ls !== lastLift) { lastLift = ls; syncUI(); }
@@ -3461,12 +3640,13 @@
         if (anim) renderer.shadowMap.needsUpdate = true;
         const fx = stepEffects(dt, now);
         const fl = stepFill(dt) || stepReserved(now);
+        const lf = stepLift(dt, now);
         doorGroup.visible = !state.wallsLow || immersive();
         const camMoved = !camera.position.equals(lastCam.p) || !camera.quaternion.equals(lastCam.q) || camera.fov !== lastCam.fov;
-        if (needsRender || camMoved || anim || fx || fl) {
-          renderAll();
-          lastCam.p.copy(camera.position); lastCam.q.copy(camera.quaternion); lastCam.fov = camera.fov;
+        if (needsRender || camMoved || anim || fx || fl || lf) {
           needsRender = false;
+          if (renderAll(camMoved || !!tween || lf)) needsRender = true;
+          lastCam.p.copy(camera.position); lastCam.q.copy(camera.quaternion); lastCam.fov = camera.fov;
           updatePills();
           checkPrograms();
         }
@@ -3486,7 +3666,7 @@
       roomLights: roomLights, setRoomLight: setRoomLight, fillC: fillC, fillT: fillT, toiletState: toiletState, flush: flush, daylight: daylight, windowOpenness: windowOpenness,
       lightRig: lightRig, pointZones: pointZones, spotZones: spotZones, APT_U: APT_U, aptPatch: aptPatch, getAptLevel: function () { return aptLevel; }, landInfo: landInfo, xmas: xmas, setXmas: setXmas, XMAS_CORNER: XMAS_CORNER, M: M, sliders: sliders, acs: acs, mirrors: mirrors, consoleState: consoleState, setConsole: setConsole, getEstarTv: function () { return estarTv; },
       landGroup: landGroup, sky: sky, sunSprite: sunSprite, lampState: lampState, ceilGroup: ceilGroup, SUN_DIR: SUN_DIR, GROUND_Y: GROUND_Y, ZONE_RECTS: ZONE_RECTS, shutterBottomOf: shutterBottomOf,
-      U: U, UINV: UINV, scene: scene, camera: camera, liftArrive: liftArrive, liftSpot: liftSpot, getLevel: function () { return level; }, GROUND: GROUND, LIFT: LIFT });
+      U: U, UINV: UINV, scene: scene, camera: camera, teleport: teleport, liftSpot: liftSpot, liftCmd: liftCmd, lift: lift, ELV: ELV, getLevel: function () { return level; }, getFloor: function () { return visitFloor; }, GROUND: GROUND });
     /* ---------------- noite (tema escuro do site): sem sol, luzes dos cômodos acesas ---------------- */
     function setNight(on) {
       dayK = on ? 0 : 1;
@@ -3533,8 +3713,10 @@
       setNight: function (on) { setNight(on); markDirty(); },
       cmd: function (id) { if (btn[id]) btn[id].click(); },
       room: function (id) { enterWalk(id); },
-      // elevador: 'terreo' desce até a portaria da torre; 'andar' sobe até o hall do andar do apto
-      lift: function (dest) { liftArrive(dest); },
+      // elevador: 'call' chama, 'open'/'close' a porta, um número (0 = térreo, 1 a 12) é o botão do painel da cabine
+      lift: function (cmd) { liftCmd(cmd); },
+      // atalhos: 'terreo' (sai na frente da torre) ou 'hall' (hall dos elevadores do andar do apto)
+      teleport: function (dest) { teleport(dest); },
       level: function () { return level; },
       // onde a câmera está, no mundo do prédio (para o prédio continuar dali ao sair)
       worldCamera: function () {

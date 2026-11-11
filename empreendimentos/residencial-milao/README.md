@@ -58,10 +58,11 @@ Montado a partir da imagem de satélite da obra (Rua Marieta Fialho Blessmann, F
 - **portaria** com o pilar MILÃO, marquise escura com testeira azul, guarita envidraçada, portão de carros e de pedestres, **de frente para a Torre A** (o acesso de carros sai do portão direto na entrada dela);
 - rua interna com **estacionamento descoberto** dos dois lados (vagas com faixa amarela, carros em metade delas) e faixas de pedestre na frente das entradas;
 - passeio de tijolinho com a faixa azul-marinho junto às torres (render "Rua Interna"), postes e bicicletários;
-- **entrada de cada torre** sob o núcleo: pórtico azul-marinho e a letra gigante amarela (A e B), como no render "Acesso";
-- **piscina** adulto e infantil com deque, espreguiçadeiras, guarda-sóis, ducha e cerca de vidro; **salão de festas** ao lado, com a frente de vidro e a faixa azul-marinho no alto (render da piscina);
+- **entrada de cada torre** sob o núcleo: pórtico azul-marinho e a letra gigante amarela (A e B), como no render "Acesso"; atrás da porta de vidro automática, o **hall de entrada** com as caixas de correio, um banco e as portas de trás dos dois elevadores (a cabine tem porta dupla: a da frente abre nos andares, a de trás no térreo);
+- **piscina** adulto (1,40 m) e infantil (0,45 m) com tanque de pastilha, faixa escura na linha d'água, luzes embaixo d'água, borda de pedra, deque, espreguiçadeiras, guarda-sóis, ducha, escadinha e cerca de vidro; **salão de festas** ao lado, com a frente de vidro e a faixa azul-marinho no alto (render da piscina), mesas com toalha, cadeiras, luminárias pendentes e balcão da copa;
 - **quiosques** com churrasqueira, bancada e mesa, pérgola de madeira; **pracinha** com torre, escorregador, balanço, gangorra e gira-gira; **espaço pet** cercado com rampa, obstáculos e túnel;
 - **reservatórios** azuis na ponta oeste (fotomontagens), abrigo de lixo junto à portaria;
+- palmeiras em volta da piscina, do salão e da portaria, cerca viva junto aos muros e canteiros floridos; as árvores só nascem fora do que é construído ou pavimentado e a copa não entra em telhado, prédio ou casa;
 - em volta: mata nativa ao sul e a leste do lote, casas da Rua Gastão ao norte, Rua Gustavo Veter a oeste e a Rua Marieta Fialho Blessmann chegando ao portão.
 
 ## Maquete do apartamento (`site/apartamento/`)
@@ -94,9 +95,11 @@ A maquete é um módulo (`AptEngine.create(opts)` em `apartamento/app.js`) que f
 - **Dois cliques** num apartamento (no 3D, no número sobre ele ou na planta do painel), ou **Ver por dentro em 3D** na ficha: a miniatura vira a maquete completa no mesmo lugar e a câmera voa do ponto onde está até o apartamento. Não abre outra tela.
 - Dentro do apto, o painel vira o controle da visita: 3D, planta, visitar (a pé, com colisão) e voar (câmera livre pelo prédio e pelo condomínio), as opções e os cômodos.
 - A porta de entrada dá para o **corredor do andar**: paredes, portas dos vizinhos com o número, elevadores, escada, forro e luz. O corredor também aparece na lista de cômodos. Na visita a pé, os andares de cima voltam a aparecer, então pela janela e pela sacada o prédio está inteiro em volta.
-- **Elevador funcionando**: no hall, em frente às portas do elevador, aparece *Chamar o elevador*; escolha o térreo, o mostrador conta os andares e você sai pela portaria da torre, a pé, para andar pelo condomínio (piscina, salão, quiosques, pracinha, espaço pet, portaria), com colisão em tudo. Debaixo do pórtico da torre, o elevador leva de volta ao andar do apto. *Térreo do condomínio* também está na lista de cômodos.
+- **Elevador funcionando como um de verdade**: no hall do andar, aperte o botão de chamar (no 3D, com a mira ou o toque, ou no botão da tela). O indicador em cima da porta conta os andares enquanto a cabine vem; a porta abre, você entra e escolhe o andar no painel da cabine (T e 1 a 12, abrir e fechar a porta), no 3D ou no painel da tela. A porta fecha (e reabre se tiver alguém na passagem), a cabine anda com você dentro, o mostrador conta os andares e a porta abre no destino: no andar do apto, no corredor de outro andar (portas dos vizinhos fechadas) ou no hall de entrada do térreo, de onde a porta de vidro automática dá para o condomínio (piscina, salão, quiosques, pracinha, espaço pet, portaria), com colisão em tudo. Para voltar, entre no hall da torre, chame e escolha o andar. *Hall do elevador* e *Térreo do condomínio* (atalho direto) estão na lista de cômodos.
 - **Voltar** no painel tira a câmera de onde a visita parou e voa de volta ao andar.
 - Mesmas cores e fontes no prédio e na maquete; no tema escuro as torres aparecem à noite e as luzes do apto ficam acesas.
+- Gráficos: reflexo do céu no vidro das janelas, na água, nos carros e no inox; água com ondinhas; textura de detalhe no chão; sombra mais nítida para quem anda no térreo; portas do corredor encaixadas no vão, com batente e guarnição.
+- Desempenho: a sombra do sol só é refeita quando a cena muda (não quando a câmera gira), as peças paradas do condomínio e do corredor são juntadas por material (poucas chamadas de desenho), árvores, carros e móveis são instanciados, e a resolução se ajusta sozinha: começa na nitidez máxima do aparelho (1,5x no celular) e só baixa se os quadros ficarem lentos.
 
 ## Próximos passos
 

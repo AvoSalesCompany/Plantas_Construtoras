@@ -70,7 +70,7 @@ const servidor = http.createServer((req, res) => {
     await clicar('#viewApto [data-cmd="vTop"]'); await page.waitForTimeout(5000); await foto('04-apto-planta');
     await clicar('#viewApto [data-cmd="vVisit"]'); await page.waitForTimeout(8000); await foto('05-visita');
     await clicar('#aptoComodos [data-room="corredor"]'); await page.waitForTimeout(8000); await foto('06-corredor');
-    await clicar('#aptoComodos [data-room="terreo"]'); await page.waitForTimeout(12000); await foto('07-terreo-de-elevador');
+    await clicar('#aptoComodos [data-room="terreo"]'); await page.waitForTimeout(12000); await foto('07-terreo');
     await clicar('#viewApto [data-cmd="vFree"]'); await page.waitForTimeout(8000); await foto('08-voar');
     await clicar('#btnSairApto'); await page.waitForTimeout(6000); await foto('09-de-volta-ao-andar');
   } catch (e) { avisos.push('passo falhou: ' + String(e.message).split('\n')[0]); }

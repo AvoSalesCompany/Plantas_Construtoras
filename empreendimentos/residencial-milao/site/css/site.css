@@ -150,7 +150,8 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .u-pill { display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px 3px 6px; border-radius: 7px; font-family: var(--f-num); font-size: 12px; font-weight: 600; }
 .u-pill::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--vendido); }
 .u-pill.is-livre::before { background: var(--livre); }
-.u-pill.is-reservado::before { background: var(--reservado); }
+.u-pill.is-reservado::before { background: var(--reservado); animation: reservaPonto 1.4s ease-in-out infinite; }
+@keyframes reservaPonto { 0%, 100% { box-shadow: 0 0 0 0 rgba(255,178,31,0); opacity: .55; } 50% { box-shadow: 0 0 0 4px rgba(255,178,31,.45); opacity: 1; } }
 .u-pill.is-dim { opacity: .4; }
 .u-pill.is-on { background: var(--ink); color: var(--bg); border-color: var(--ink); }
 .t-pill:hover, .u-pill:hover { border-color: var(--gold); }
@@ -194,7 +195,9 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .cells { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 3px; }
 .cells i { height: 14px; border-radius: 3px; background: var(--vendido); }
 .cells i.is-livre { background: var(--livre); }
-.cells i.is-reservado { background: var(--reservado); }
+.cells i.is-reservado { background: var(--reservado); animation: reservaCelula 1.4s ease-in-out infinite; }
+@keyframes reservaCelula { 0%, 100% { opacity: .45; } 50% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .u-pill.is-reservado::before, .cells i.is-reservado { animation: none; } }
 .cells i.is-dim { opacity: .22; }
 .cells i.is-sac { box-shadow: inset 0 -3px 0 rgba(0, 0, 0, .18); }
 .floor-free { font-family: var(--f-num); font-size: 12.5px; color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; }
@@ -216,7 +219,9 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .plate .pl-u.is-livre .pl-base { fill: var(--livre); }
 .plate .pl-u.is-reservado .pl-base { fill: var(--reservado); }
 .plate .pl-u .pl-tint { fill: transparent; pointer-events: none; }
-.plate .pl-u.is-reservado .pl-tint { fill: #0B0F1C; opacity: .68; }
+.plate .pl-u.is-reservado .pl-tint { fill: #FFB21F; opacity: .5; animation: reservaPisca 1.4s ease-in-out infinite; }
+@keyframes reservaPisca { 0%, 100% { opacity: .08; } 50% { opacity: .62; } }
+@media (prefers-reduced-motion: reduce) { .plate .pl-u.is-reservado .pl-tint { animation: none; opacity: .4; } }
 .plate .pl-u.is-vendido .pl-tint { fill: #0B0F1C; opacity: .68; }
 .plate .pl-u .pl-frame { fill: none; stroke: transparent; stroke-width: 2; }
 .plate .pl-u:hover .pl-frame, .plate .pl-u:focus-visible .pl-frame { stroke: var(--gold); }
@@ -370,6 +375,52 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .apt-entering::before { content: ""; flex: none; width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--line); border-top-color: var(--gold); animation: spin .8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .apt-entering::before { animation: none; } }
+/* apto reservado: aviso com a luz âmbar piscando */
+.apt-res {
+  position: absolute; right: max(16px, env(safe-area-inset-right, 0px)); top: 16px; display: inline-flex; align-items: center; gap: 8px;
+  padding: 7px 12px; border-radius: 999px; background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow);
+  font-size: 12.5px; font-weight: 650; pointer-events: none !important;
+}
+.apt-res i { width: 10px; height: 10px; border-radius: 50%; background: #FFB21F; animation: reservaPonto 1.4s ease-in-out infinite; }
+/* elevador: botão em frente às portas (andar) ou sob o pórtico da torre (térreo), menu dos andares e a viagem */
+.apt-lift { position: absolute; right: max(16px, env(safe-area-inset-right, 0px)); bottom: 62px; display: grid; justify-items: end; gap: 8px; }
+.apt-lift .btn::before {
+  content: ""; width: 14px; height: 14px; margin-right: 7px; flex: none;
+  background: currentColor;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 14'%3E%3Cpath d='M7 0.5l4.6 5H2.4zM7 13.5l4.6-5H2.4z'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 14'%3E%3Cpath d='M7 0.5l4.6 5H2.4zM7 13.5l4.6-5H2.4z'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+.apt-lift-menu {
+  display: grid; gap: 4px; min-width: 250px; max-width: calc(100vw - 48px); padding: 10px; border-radius: 14px;
+  background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow);
+}
+.apt-lift-menu p { margin: 0 4px 4px; font-size: 10.5px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+.apt-lift-menu button {
+  appearance: none; display: grid; grid-template-columns: 38px minmax(0, 1fr); align-items: center; gap: 10px; padding: 7px 8px; text-align: left;
+  border: 1px solid transparent; border-radius: 10px; background: transparent; color: var(--ink); cursor: pointer; font-size: 13.5px; font-weight: 600;
+}
+.apt-lift-menu button b {
+  display: grid; place-items: center; width: 38px; height: 38px; border-radius: 50%; border: 1.5px solid var(--line);
+  font-family: var(--f-num); font-size: 15px; font-variant-numeric: tabular-nums;
+}
+.apt-lift-menu button:hover, .apt-lift-menu button:focus-visible { border-color: var(--gold); outline: none; }
+.apt-lift-menu button[aria-current="true"] b { background: var(--gold); border-color: var(--gold); color: var(--gold-ink); }
+.apt-ride {
+  position: absolute; inset: 0; z-index: 6; display: grid; place-items: center; background: rgba(8, 10, 16, .0);
+  transition: background-color .35s ease; pointer-events: auto;
+}
+.apt-ride.is-on { background: rgba(8, 10, 16, .9); }
+.apt-ride-box {
+  display: grid; justify-items: center; gap: 2px; padding: 18px 26px; border-radius: 14px; background: #0B0D10; color: #FF4436;
+  box-shadow: 0 0 0 1px rgba(255,255,255,.08), 0 10px 40px rgba(0,0,0,.5); opacity: 0; transform: translateY(6px);
+  transition: opacity .3s ease, transform .3s ease;
+}
+.apt-ride.is-on .apt-ride-box { opacity: 1; transform: none; }
+.apt-ride-arrow { font-size: 18px; line-height: 1; }
+.apt-ride-box strong { font-family: var(--f-num); font-size: 56px; line-height: 1.05; font-variant-numeric: tabular-nums; }
+.apt-ride-box small { color: #E9E4DA; font-size: 12.5px; font-weight: 600; letter-spacing: .04em; }
+@media (prefers-reduced-motion: reduce) { .apt-ride, .apt-ride-box { transition: none; } .apt-res i { animation: none; } }
+@media (max-width: 759px) { .apt-res { top: auto; bottom: 62px; left: max(16px, env(safe-area-inset-left, 0px)); right: auto; } }
 .canvas-box:has(.apt-hud.is-immersive) #predio { cursor: crosshair; }
 .canvas-box:has(.apt-hud.is-locked) #predio { cursor: none; }
 .canvas-box:fullscreen { background: var(--bg); }

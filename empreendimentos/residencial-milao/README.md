@@ -39,7 +39,8 @@ Fonte: [balizaconstrutora.com.br/empreendimentos/residencial-milao](https://bali
 
 A construtora não publica o número de torres, andares e apartamentos por andar. Pelas fachadas e fotos aéreas, o site usa:
 
-- **2 torres lado a lado** (A à esquerda, B à direita e um pouco recuada), de frente para a rua, com estacionamento na frente e lazer nos fundos;
+- **2 torres lado a lado** junto ao muro do fundo do terreno (casas da Rua Gastão atrás), quase alinhadas (a B 1,5 m à frente), viradas para o estacionamento e o lazer;
+- cada torre tem **duas alas desencontradas** ligadas pelo núcleo de elevadores e escada (fotomontagens da Baliza): a ala leste (aptos 4 a 9) fica 4 m à frente da oeste, e o hall do núcleo liga os dois corredores;
 - **térreo + 12 andares**, **12 apartamentos por andar** = 288 unidades;
 - apartamentos `n01` a `n12` em cada andar `n` (101 a 1212), batendo com as plantas publicadas: **Apto Canto-101** (com sacada) e **Apto Meio-103** (sem sacada);
 - posições 1 a 6 na frente e 7 a 12 nos fundos; os 4 cantos (1, 6, 7, 12) têm sacada, na ponta do prédio;
@@ -49,6 +50,19 @@ A construtora não publica o número de torres, andares e apartamentos por andar
 - piso a piso de 2,84 m.
 
 A disponibilidade (disponível, reservado, vendido) é ilustrativa e sempre a mesma para cada apartamento. No site em produção ela viria do sistema de vendas.
+
+### Condomínio (térreo)
+
+Montado a partir da imagem de satélite da obra (Rua Marieta Fialho Blessmann, Feitoria) e das fotomontagens e tours da Baliza, nas proporções reais, mas sem levantamento topográfico:
+
+- **portaria** com o pilar MILÃO, marquise escura com testeira azul, guarita envidraçada, portão de carros e de pedestres, **de frente para a Torre A** (o acesso de carros sai do portão direto na entrada dela);
+- rua interna com **estacionamento descoberto** dos dois lados (vagas com faixa amarela, carros em metade delas) e faixas de pedestre na frente das entradas;
+- passeio de tijolinho com a faixa azul-marinho junto às torres (render "Rua Interna"), postes e bicicletários;
+- **entrada de cada torre** sob o núcleo: pórtico azul-marinho e a letra gigante amarela (A e B), como no render "Acesso";
+- **piscina** adulto e infantil com deque, espreguiçadeiras, guarda-sóis, ducha e cerca de vidro; **salão de festas** ao lado, com a frente de vidro e a faixa azul-marinho no alto (render da piscina);
+- **quiosques** com churrasqueira, bancada e mesa, pérgola de madeira; **pracinha** com torre, escorregador, balanço, gangorra e gira-gira; **espaço pet** cercado com rampa, obstáculos e túnel;
+- **reservatórios** azuis na ponta oeste (fotomontagens), abrigo de lixo junto à portaria;
+- em volta: mata nativa ao sul e a leste do lote, casas da Rua Gastão ao norte, Rua Gustavo Veter a oeste e a Rua Marieta Fialho Blessmann chegando ao portão.
 
 ## Maquete do apartamento (`site/apartamento/`)
 
@@ -75,10 +89,12 @@ A maquete é um módulo (`AptEngine.create(opts)` em `apartamento/app.js`) que f
 
 ## Site (`site/`)
 
-- O prédio abre girando devagar; passar o mouse acende o andar e clicar abre a laje com os 12 apartamentos em miniatura 3D (paredes e móveis), acesos se disponíveis e apagados se reservados ou vendidos.
+- O prédio abre girando devagar; passar o mouse acende o andar e clicar abre a laje com os 12 apartamentos em miniatura 3D (paredes e móveis), acesos se disponíveis e apagados se vendidos.
+- **Reservados piscam em âmbar**: as janelas deles nas fachadas das duas torres, a miniatura no andar aberto, a célula na lista de andares e o apto na planta do painel. Dentro de um apto reservado, as luzes dos cômodos piscam e um aviso diz que ele está reservado.
 - **Dois cliques** num apartamento (no 3D, no número sobre ele ou na planta do painel), ou **Ver por dentro em 3D** na ficha: a miniatura vira a maquete completa no mesmo lugar e a câmera voa do ponto onde está até o apartamento. Não abre outra tela.
 - Dentro do apto, o painel vira o controle da visita: 3D, planta, visitar (a pé, com colisão) e voar (câmera livre pelo prédio e pelo condomínio), as opções e os cômodos.
 - A porta de entrada dá para o **corredor do andar**: paredes, portas dos vizinhos com o número, elevadores, escada, forro e luz. O corredor também aparece na lista de cômodos. Na visita a pé, os andares de cima voltam a aparecer, então pela janela e pela sacada o prédio está inteiro em volta.
+- **Elevador funcionando**: no hall, em frente às portas do elevador, aparece *Chamar o elevador*; escolha o térreo, o mostrador conta os andares e você sai pela portaria da torre, a pé, para andar pelo condomínio (piscina, salão, quiosques, pracinha, espaço pet, portaria), com colisão em tudo. Debaixo do pórtico da torre, o elevador leva de volta ao andar do apto. *Térreo do condomínio* também está na lista de cômodos.
 - **Voltar** no painel tira a câmera de onde a visita parou e voa de volta ao andar.
 - Mesmas cores e fontes no prédio e na maquete; no tema escuro as torres aparecem à noite e as luzes do apto ficam acesas.
 
@@ -87,3 +103,4 @@ A maquete é um módulo (`AptEngine.create(opts)` em `apartamento/app.js`) que f
 - Ligar a disponibilidade ao sistema de vendas da construtora.
 - Confirmar com a construtora o número de torres, andares e aptos por andar e a numeração.
 - Confirmar com a construtora a largura real do corredor e quais aptos são espelhados.
+- Confirmar a implantação do condomínio (posição da piscina, do salão, da pracinha e do espaço pet) com o projeto aprovado.

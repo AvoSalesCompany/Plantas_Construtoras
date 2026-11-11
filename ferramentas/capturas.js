@@ -2,7 +2,7 @@
 /*
  * Capturas de tela reais (WebGL) do site, num Chromium sem janela (Playwright).
  * Diferente do teste de fumaça, aqui o 3D é desenhado de verdade: serve para conferir se a maquete abriu no lugar certo,
- * se o corredor aparece, se a câmera voltou para o andar etc.
+ * se o corredor aparece, se o elevador desce ao térreo do condomínio, se a câmera voltou para o andar etc.
  *
  * Uso (dentro da pasta do repositório):
  *   node ferramentas/capturas.js empreendimentos/residencial-milao/site [pasta-de-saida] [--libs /caminho/do/three]
@@ -70,8 +70,9 @@ const servidor = http.createServer((req, res) => {
     await clicar('#viewApto [data-cmd="vTop"]'); await page.waitForTimeout(5000); await foto('04-apto-planta');
     await clicar('#viewApto [data-cmd="vVisit"]'); await page.waitForTimeout(8000); await foto('05-visita');
     await clicar('#aptoComodos [data-room="corredor"]'); await page.waitForTimeout(8000); await foto('06-corredor');
-    await clicar('#viewApto [data-cmd="vFree"]'); await page.waitForTimeout(8000); await foto('07-voar');
-    await clicar('#btnSairApto'); await page.waitForTimeout(6000); await foto('08-de-volta-ao-andar');
+    await clicar('#aptoComodos [data-room="terreo"]'); await page.waitForTimeout(12000); await foto('07-terreo-de-elevador');
+    await clicar('#viewApto [data-cmd="vFree"]'); await page.waitForTimeout(8000); await foto('08-voar');
+    await clicar('#btnSairApto'); await page.waitForTimeout(6000); await foto('09-de-volta-ao-andar');
   } catch (e) { avisos.push('passo falhou: ' + String(e.message).split('\n')[0]); }
   await browser.close(); servidor.close();
   console.log(avisos.length ? avisos.join('\n') : 'sem erros no navegador');

@@ -2431,18 +2431,46 @@
         return [Math.min(a.x, b.x), Math.min(a.z, b.z), Math.max(a.x, b.x), Math.max(a.z, b.z)];
       };
       (INTEG.walls || []).forEach(function (r) { const q = rectL(r); staticBoxes.push({ x0: q[0], x1: q[2], z0: q[1], z1: q[3], k: 'arch' }); });
-      if (INTEG.walk) WALK.push(rectL(INTEG.walk));
+      if (INTEG.walk) (Array.isArray(INTEG.walk[0]) ? INTEG.walk : [INTEG.walk]).forEach(function (r) { WALK.push(rectL(r)); });
       if (INTEG.corridor) {
-        CORR_ROOM = { id: 'corredor', name: INTEG.corridor.name || 'Corredor', area: '', dims: '', rects: [], walk: WALK[1] || null,
+        CORR_ROOM = { id: 'corredor', name: INTEG.corridor.name || 'Corredor', area: '', dims: '', rects: [], walk: WALK.slice(1),
           viewL: { at: new THREE.Vector3().fromArray(INTEG.corridor.at).applyMatrix4(UINV), to: new THREE.Vector3().fromArray(INTEG.corridor.to).applyMatrix4(UINV) } };
       }
     }
+    /* ---------------- elevador e térreo do condomínio ----------------
+       O elevador do hall leva ao térreo: o visitante sai pela portaria da torre e anda pelo condomínio (piscina, salão,
+       quiosques, pracinha, espaço pet, portaria), com a colisão do térreo; pela entrada da torre, volta ao andar. */
+    let level = 'apt';                                 // 'apt': apto e corredor do andar; 'ground': térreo do condomínio
+    const GROUND = INTEG && INTEG.ground ? (function () {
+      const rectL = function (r) {
+        const a = new THREE.Vector3(r[0], 0, r[1]).applyMatrix4(UINV), b = new THREE.Vector3(r[2], 0, r[3]).applyMatrix4(UINV);
+        return [Math.min(a.x, b.x), Math.min(a.z, b.z), Math.max(a.x, b.x), Math.max(a.z, b.z)];
+      };
+      const vL = function (v) { return new THREE.Vector3().fromArray(v).applyMatrix4(UINV); };
+      const G = INTEG.ground;
+      return {
+        boxes: (G.walls || []).map(function (r) { const q = rectL(r); return { x0: q[0], x1: q[2], z0: q[1], z1: q[3], k: 'arch' }; }),
+        walk: (G.walk || []).map(rectL),
+        zones: (G.zones || []).map(function (z) { return { id: z.id, name: z.name, area: '', dims: '', q: rectL(z.r) }; }),
+        yard: { id: 'terreo', name: G.name || 'Térreo do condomínio', area: '', dims: '' },
+        spawn: { at: vL(G.spawn.at), to: vL(G.spawn.to) },
+        lift: rectL(G.lift)
+      };
+    })() : null;
+    const LIFT = INTEG && INTEG.lift ? (function () {
+      const a = new THREE.Vector3(INTEG.lift.zone[0], 0, INTEG.lift.zone[1]).applyMatrix4(UINV), b = new THREE.Vector3(INTEG.lift.zone[2], 0, INTEG.lift.zone[3]).applyMatrix4(UINV);
+      return { q: [Math.min(a.x, b.x), Math.min(a.z, b.z), Math.max(a.x, b.x), Math.max(a.z, b.z)],
+        at: new THREE.Vector3().fromArray(INTEG.lift.at).applyMatrix4(UINV), to: new THREE.Vector3().fromArray(INTEG.lift.to).applyMatrix4(UINV) };
+    })() : null;
+    const inQ = function (q, x, z) { return x >= q[0] && x <= q[2] && z >= q[1] && z <= q[3]; };
+    function baseY() { return level === 'ground' ? GROUND_Y : 0; }
     // rede de segurança: o centro do visitante fica dentro do apto ou do corredor (as paredes já seguram o corpo dele)
     function clampWalk(p, r) {
-      if (WALK.length === 1) { p.x = clamp(p.x, -CX + r, CX - r); p.z = clamp(p.z, -CZ + r, CZ - r); return; }
+      const list = level === 'ground' && GROUND ? GROUND.walk : WALK;
+      if (list === WALK && WALK.length === 1) { p.x = clamp(p.x, -CX + r, CX - r); p.z = clamp(p.z, -CZ + r, CZ - r); return; }
       let bx = p.x, bz = p.z, bd = Infinity;
-      for (let i = 0; i < WALK.length; i++) {
-        const q = WALK[i], x = clamp(p.x, q[0], q[2]), z = clamp(p.z, q[1], q[3]), d = (x - p.x) * (x - p.x) + (z - p.z) * (z - p.z);
+      for (let i = 0; i < list.length; i++) {
+        const q = list[i], x = clamp(p.x, q[0], q[2]), z = clamp(p.z, q[1], q[3]), d = (x - p.x) * (x - p.x) + (z - p.z) * (z - p.z);
         if (d < bd) { bd = d; bx = x; bz = z; }
       }
       p.x = bx; p.z = bz;
@@ -2663,6 +2691,10 @@
     }
     function collide(p, r) {
       const furn = state.furniture;
+      if (level === 'ground' && GROUND) {
+        for (let it = 0; it < 6; it++) { let hit = false; for (let i = 0; i < GROUND.boxes.length; i++) if (pushBox(p, r, GROUND.boxes[i])) hit = true; if (!hit) break; }
+        clampWalk(p, r); return;
+      }
       for (let it = 0; it < 6; it++) {
         let hit = false;
         for (let i = 0; i < staticBoxes.length; i++) { const b = staticBoxes[i]; if (b.k === 'furn' && !furn) continue; if (pushBox(p, r, b)) hit = true; }
@@ -2682,6 +2714,7 @@
         const pen = (p.x > b.x0 && p.x < b.x1 && p.z > b.z0 && p.z < b.z1) ? r + 0.1 : r - Math.hypot(p.x - cx, p.z - cz);
         if (pen > worst) worst = pen;
       };
+      if (level === 'ground' && GROUND) { GROUND.boxes.forEach(chk); return worst; }
       for (let i = 0; i < staticBoxes.length; i++) { const b = staticBoxes[i]; if (b.k === 'furn' && !furn) continue; chk(b); }
       if (furn) sliders.forEach(function (sl) { if (sl.box) chk(sl.box()); });
       archBlocks.forEach(function (f) { chk(f()); });
@@ -2755,6 +2788,7 @@
     }
     function leaveImmersive() {
       if (locked && document.exitPointerLock) { try { document.exitPointerLock(); } catch (e) { /* já solto */ } }
+      setLevel('apt');
       ceilGroup.visible = false; keys.clear(); upHeld = 0; downHeld = 0; joy.x = 0; joy.y = 0; joy.id = null;
       player.pose = null; player.target = null; ptween = null; currentRoom = null; hideTip();
       overlay.visible = state.overlay;
@@ -2773,11 +2807,15 @@
       flyTo(p.pos, p.target, p.fov, 1000, function () { settleOutside(p.target); });
     }
     function roomAt(x, z) {
+      if (level === 'ground' && GROUND) {
+        const zn = GROUND.zones.find(function (q) { return inQ(q.q, x, z); });
+        return zn || GROUND.yard;
+      }
       const px = (x + CX) * S + OX, pz = (z + CZ) * S + OY;
       const rm = P.rooms.find(function (q) { return q.rects.some(function (r) { return px >= r[0] && px <= r[2] && pz >= r[1] && pz <= r[3]; }); });
       if (rm) return rm;
-      const w = CORR_ROOM && CORR_ROOM.walk;
-      return w && x >= w[0] && x <= w[2] && z >= w[1] && z <= w[3] ? CORR_ROOM : null;
+      const ws = CORR_ROOM ? CORR_ROOM.walk : [];
+      return ws.some(function (w) { return x >= w[0] && x <= w[2] && z >= w[1] && z <= w[3]; }) ? CORR_ROOM : null;
     }
     function focusCanvas() {
       try { if (document.activeElement && document.activeElement !== canvas && document.activeElement.blur) document.activeElement.blur(); canvas.focus({ preventScroll: true }); } catch (e) { /* sem foco */ }
@@ -2793,6 +2831,7 @@
       const rm = P.rooms.find(function (r) { return r.id === id; }) || (id === 'corredor' ? CORR_ROOM : null);
       if (!rm) return;
       beginImmersive();
+      setLevel('apt');
       view = 'walk'; camera.near = 0.04; camera.updateProjectionMatrix(); currentRoom = rm;
       ceilGroup.visible = true;
       const at = rm.viewL ? rm.viewL.at.clone().setY(EYE) : new THREE.Vector3(wx(rm.view.at[0]), EYE, wz(rm.view.at[1]));
@@ -2805,6 +2844,16 @@
     }
     function walkFromFree() {
       const x = player.pos.x, z = player.pos.z;
+      if (GROUND && player.pos.y < GROUND_Y + 6) {                   // voando perto do chão: pousa no térreo
+        const prev = level; setLevel('ground');
+        if (!isBlocked(x, z) && GROUND.walk.some(function (q) { return inQ(q, x, z); })) {
+          view = 'walk'; player.vel.set(0, 0, 0); currentRoom = roomAt(x, z);
+          tweenPlayer(new THREE.Vector3(x, GROUND_Y + EYE, z), player.yaw, clamp(player.pitch, -0.5, 0.5), 650, null);
+          syncUI(); focusCanvas(); return;
+        }
+        setLevel(prev);
+      }
+      if (level === 'ground') { liftArrive('terreo'); return; }
       if (!roomAt(x, z) || isBlocked(x, z)) { enterWalk(currentRoom ? currentRoom.id : 'circ'); return; }
       view = 'walk'; player.vel.set(0, 0, 0); currentRoom = roomAt(x, z);
       tweenPlayer(new THREE.Vector3(x, EYE, z), player.yaw, clamp(player.pitch, -0.5, 0.5), 650, null);
@@ -2825,6 +2874,37 @@
       syncUI(); focusCanvas(); autoLock();
     }
     function setRotate(on) { controls.autoRotate = !!on; syncUI(); }
+    // troca de nível: no térreo a maquete do apto some (o prédio inteiro aparece no lugar do andar aberto)
+    function setLevel(lv) {
+      if (lv === level) return;
+      level = lv;
+      root.visible = lv !== 'ground';
+      dirtyShadows(); notifyView();
+    }
+    // onde o visitante está em relação ao elevador: 'andar' (hall do andar), 'terreo' (portaria da torre) ou nada
+    function liftSpot() {
+      if (view !== 'walk' || player.pose) return null;
+      if (level === 'ground') return GROUND && inQ(GROUND.lift, player.pos.x, player.pos.z) ? 'terreo' : null;
+      return LIFT && inQ(LIFT.q, player.pos.x, player.pos.z) ? 'andar' : null;
+    }
+    // chegada do elevador: no térreo, saindo da portaria da torre; no andar, de frente para o corredor
+    function liftArrive(dest) {
+      if (dest === 'terreo' && !GROUND) return;
+      if (dest !== 'terreo' && !LIFT) return;
+      if (!immersive()) beginImmersive();
+      tween = null; ptween = null; player.target = null; player.pose = null; player.vel.set(0, 0, 0);
+      setLevel(dest === 'terreo' ? 'ground' : 'apt');
+      view = 'walk'; camera.near = 0.04; camera.fov = 70; camera.updateProjectionMatrix();
+      const at = dest === 'terreo' ? GROUND.spawn.at.clone() : LIFT.at.clone(), to = dest === 'terreo' ? GROUND.spawn.to.clone() : LIFT.to.clone();
+      at.y = baseY() + EYE; to.y = baseY() + EYE - 0.3;
+      const dir = to.sub(at).normalize();
+      player.yaw = Math.atan2(dir.x, dir.z); player.pitch = Math.asin(clamp(dir.y, -1, 1));
+      player.pos.copy(at);
+      ceilGroup.visible = dest !== 'terreo';
+      currentRoom = roomAt(at.x, at.z);
+      camera.position.copy(player.pos); camera.lookAt(tmpV.copy(player.pos).add(lookDir()));
+      syncUI(); focusCanvas(); markDirty();
+    }
     function setWallsLow(low) { state.wallsLow = low; buildArchitecture(low ? H_LOW : H_HIGH); syncUI(); }
 
     /* ---------------- visitante: andar, voar, deitar, sentar ---------------- */
@@ -2894,7 +2974,7 @@
         collide(p, RADIUS);
         const penNew = maxPen(p, RADIUS);
         if (penNew > 0.004 && penNew >= maxPen({ x: bx, z: bz }, RADIUS)) { p.x = bx; p.z = bz; player.vel.x *= 0.3; player.vel.z *= 0.3; }
-        player.pos.x = p.x; player.pos.z = p.z; player.pos.y = EYE;
+        player.pos.x = p.x; player.pos.z = p.z; player.pos.y = baseY() + EYE;
         if (player.target) {
           if (Math.hypot(p.x - bx, p.z - bz) < speed * dt * 0.15) { player.stuck += dt; if (player.stuck > 0.4) { player.target = null; player.stuck = 0; } } else player.stuck = 0;
         }
@@ -2985,13 +3065,14 @@
       hint.textContent = h;
       notifyView();
       if (EMBED || opts.onMessage) postParent({ type: 'apt:state', view: view, imm: imm, pose: !!player.pose, room: currentRoom ? currentRoom.id : null,
+        roomName: currentRoom ? currentRoom.name : '', level: level, lift: liftSpot(),
         rotate: !!controls.autoRotate, wallsLow: state.wallsLow, furniture: state.furniture, labels: state.labels, doorsOpen: state.doorsOpen, overlay: state.overlay, hint: h });
     }
     function postParent(msg) {
       if (opts.onMessage) { try { opts.onMessage(msg); } catch (e) { console.error(e); } return; }
       try { if (window.parent && window.parent !== window) window.parent.postMessage(msg, '*'); } catch (e) { /* sem site em volta */ }
     }
-    function notifyView() { if (INTEG && INTEG.onView) { try { INTEG.onView(view, ceilGroup.visible); } catch (e) { console.error(e); } } }
+    function notifyView() { if (INTEG && INTEG.onView) { try { INTEG.onView(view, ceilGroup.visible, level); } catch (e) { console.error(e); } } }
     // comandos vindos do painel do site: os mesmos botões da maquete, entrar num cômodo ou voltar à vista 3D
     on(window, 'message', function (e) {
       if (!EMBED || e.source !== window.parent) return;
@@ -3314,9 +3395,28 @@
     }
     if (U) scene.updateMatrixWorld(true);
 
+    /* ---------------- apto reservado: as luzes dos cômodos piscam em âmbar (como as janelas dele na fachada) ---------------- */
+    const RESERVED = !!(INTEG && INTEG.reservado);
+    let resT = 0;
+    if (RESERVED) Object.keys(roomLights).forEach(function (id) {
+      const rl = roomLights[id];
+      rl.mat.emissive.copy(lin('#FFB21F')); rl.lights.forEach(function (l) { l.color.copy(lin('#FFC35A')); });
+    });
+    function stepReserved(now) {
+      if (!RESERVED || level !== 'apt' || now - resT < 50) return false;
+      resT = now;
+      const s = 0.5 + 0.5 * Math.sin(now / 1000 * Math.PI * 2 / 1.4), k = s * s * (3 - 2 * s);
+      Object.keys(roomLights).forEach(function (id) {
+        const rl = roomLights[id];
+        rl.mat.emissiveIntensity = 0.08 + 1.7 * k;
+        rl.lights.forEach(function (l) { l.intensity = rl.power * (0.1 + 1.2 * k); });
+      });
+      return true;
+    }
+
     /* ---------------- laço de render (só desenha quando algo muda) ---------------- */
     const lastCam = { p: new THREE.Vector3(Infinity, 0, 0), q: new THREE.Quaternion(), fov: 0 };
-    let last = performance.now(), ready = false, frameErr = false, lastCeilVis = null;
+    let last = performance.now(), ready = false, frameErr = false, lastCeilVis = null, lastLift = null;
     function frame(now) {
       if (disposed) return;
       rafId = requestAnimationFrame(frame);
@@ -3328,8 +3428,10 @@
           if (stepPlayer(dt, now)) markDirty();
           camera.position.copy(player.pos);
           camera.lookAt(tmpV.copy(player.pos).add(lookDir()));
-          const ceilOn = view === 'walk' || player.pos.y < H_HIGH - 0.03;
+          const ceilOn = level !== 'ground' && (view === 'walk' || player.pos.y < H_HIGH - 0.03);
           if (ceilGroup.visible !== ceilOn) { ceilGroup.visible = ceilOn; markDirty(); }
+          const ls = liftSpot();
+          if (ls !== lastLift) { lastLift = ls; syncUI(); }
           const rm = roomAt(player.pos.x, player.pos.z);
           if (view === 'walk' ? (rm && rm !== currentRoom) : rm !== currentRoom) { currentRoom = rm; syncUI(); }
           if (edgeX && lockFailed && !locked) { player.yaw -= MX * edgeX * 1.7 * dt; markDirty(); }
@@ -3358,7 +3460,7 @@
         anim = stepACs(dt) || anim;
         if (anim) renderer.shadowMap.needsUpdate = true;
         const fx = stepEffects(dt, now);
-        const fl = stepFill(dt);
+        const fl = stepFill(dt) || stepReserved(now);
         doorGroup.visible = !state.wallsLow || immersive();
         const camMoved = !camera.position.equals(lastCam.p) || !camera.quaternion.equals(lastCam.q) || camera.fov !== lastCam.fov;
         if (needsRender || camMoved || anim || fx || fl) {
@@ -3383,7 +3485,8 @@
     if (dbg) Object.assign(dbg, { doorState: doorState, winState: winState, enterWalk: enterWalk, enterFree: enterFree, walkFromFree: walkFromFree, standUp: standUp, sitOrLie: sitOrLie, POSES: POSES, keys: keys, state: state, getView: function () { return view; }, roomAt: roomAt, furnHinges: furnHinges, archHinges: archHinges, faucets: faucets, tvs: tvs, cooktops: cooktops, showerSlide: showerSlide, camera: camera, controls: controls, isLocked: function () { return locked; }, isLockFailed: function () { return lockFailed; },
       roomLights: roomLights, setRoomLight: setRoomLight, fillC: fillC, fillT: fillT, toiletState: toiletState, flush: flush, daylight: daylight, windowOpenness: windowOpenness,
       lightRig: lightRig, pointZones: pointZones, spotZones: spotZones, APT_U: APT_U, aptPatch: aptPatch, getAptLevel: function () { return aptLevel; }, landInfo: landInfo, xmas: xmas, setXmas: setXmas, XMAS_CORNER: XMAS_CORNER, M: M, sliders: sliders, acs: acs, mirrors: mirrors, consoleState: consoleState, setConsole: setConsole, getEstarTv: function () { return estarTv; },
-      landGroup: landGroup, sky: sky, sunSprite: sunSprite, lampState: lampState, ceilGroup: ceilGroup, SUN_DIR: SUN_DIR, GROUND_Y: GROUND_Y, ZONE_RECTS: ZONE_RECTS, shutterBottomOf: shutterBottomOf });
+      landGroup: landGroup, sky: sky, sunSprite: sunSprite, lampState: lampState, ceilGroup: ceilGroup, SUN_DIR: SUN_DIR, GROUND_Y: GROUND_Y, ZONE_RECTS: ZONE_RECTS, shutterBottomOf: shutterBottomOf,
+      U: U, UINV: UINV, scene: scene, camera: camera, liftArrive: liftArrive, liftSpot: liftSpot, getLevel: function () { return level; }, GROUND: GROUND, LIFT: LIFT });
     /* ---------------- noite (tema escuro do site): sem sol, luzes dos cômodos acesas ---------------- */
     function setNight(on) {
       dayK = on ? 0 : 1;
@@ -3430,6 +3533,9 @@
       setNight: function (on) { setNight(on); markDirty(); },
       cmd: function (id) { if (btn[id]) btn[id].click(); },
       room: function (id) { enterWalk(id); },
+      // elevador: 'terreo' desce até a portaria da torre; 'andar' sobe até o hall do andar do apto
+      lift: function (dest) { liftArrive(dest); },
+      level: function () { return level; },
       // onde a câmera está, no mundo do prédio (para o prédio continuar dali ao sair)
       worldCamera: function () {
         const p = camera.position.clone(), t = currentTarget();

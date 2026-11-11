@@ -7,7 +7,7 @@ Cada empreendimento tem um site onde a pessoa gira o prédio em 3D, escolhe a to
 
 | Empreendimento | Construtora | Cidade | Site | O que tem |
 | --- | --- | --- | --- | --- |
-| [Residencial Milão](empreendimentos/residencial-milao/) | Baliza | São Leopoldo/RS | [`site/`](empreendimentos/residencial-milao/site/) | 2 torres lado a lado em 3D, escolha por andar, andar aberto com cada apto em miniatura 3D, dois cliques para entrar no apto no lugar dele no bloco, visita a pé com saída para o corredor do andar |
+| [Residencial Milão](empreendimentos/residencial-milao/) | Baliza | São Leopoldo/RS | [`site/`](empreendimentos/residencial-milao/site/) | 2 torres com alas desencontradas e o condomínio inteiro em 3D, escolha por andar, reservados piscando, dois cliques para entrar no apto no lugar dele no bloco, visita a pé pelo corredor e de elevador até a piscina, o salão e a pracinha |
 
 ## Estrutura
 

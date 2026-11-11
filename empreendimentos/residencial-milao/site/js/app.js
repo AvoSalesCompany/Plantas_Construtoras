@@ -125,16 +125,18 @@
     });
   });
   function renderPlanta() {
-    const S = 10, HLm = Predio3D.L / 2, HDm = Predio3D.HD, CR = Predio3D.CORR, X = function (x) { return (x + HLm) * S; }, Y = function (z) { return (z + HDm) * S; };
-    const R = Predio3D.unitRect, W = Predio3D.L * S, H = Predio3D.D * S;
-    let svg = '<rect class="pl-slab" x="0" y="0" width="' + W + '" height="' + H + '" rx="3"/>';
-    const nucleos = [[-1.8, 1.8, CR, HDm - 0.5], [-1.8, 1.8, -HDm + 0.5, -CR]];
-    Predio3D.BAYS.forEach(function (b) { if (b[0] === 'faixa') { nucleos.push([b[1], b[2], CR, HDm - 0.3], [b[1], b[2], -HDm + 0.3, -CR]); } });
-    nucleos.forEach(function (c) {
-      svg += '<rect class="pl-core" x="' + X(c[0]) + '" y="' + Y(c[2]) + '" width="' + (c[1] - c[0]) * S + '" height="' + (c[3] - c[2]) * S + '" rx="2"/>';
+    const S = 10, HLm = Predio3D.L / 2, Z0 = Predio3D.Z_MIN, X = function (x) { return (x + HLm) * S; }, Y = function (z) { return (z - Z0) * S; };
+    const R = Predio3D.unitRect, W = Predio3D.L * S, H = (Predio3D.Z_MAX - Z0) * S;
+    $('planta').setAttribute('viewBox', '-10 -26 ' + (W + 20) + ' ' + (H + 58));
+    let svg = '';
+    Predio3D.PARTS.forEach(function (pt) {                 // as duas alas desencontradas e o núcleo entre elas
+      svg += '<rect class="pl-slab" x="' + X(pt.x0) + '" y="' + Y(pt.z0) + '" width="' + (pt.x1 - pt.x0) * S + '" height="' + (pt.z1 - pt.z0) * S + '" rx="3"/>';
+    });
+    Predio3D.SHAFTS.forEach(function (c) {
+      svg += '<rect class="pl-core" x="' + X(c[0]) + '" y="' + Y(c[1]) + '" width="' + (c[2] - c[0]) * S + '" height="' + (c[3] - c[1]) * S + '" rx="2"/>';
     });
     svg += '<text class="pl-txt" x="' + W / 2 + '" y="-12" text-anchor="middle">Fundos</text>';
-    svg += '<text class="pl-txt" x="' + W / 2 + '" y="' + (H + 30) + '" text-anchor="middle">Frente · entrada</text>';
+    svg += '<text class="pl-txt" x="' + W / 2 + '" y="' + (H + 26) + '" text-anchor="middle">Frente · entrada</text>';
     for (let p = 1; p <= 12; p++) {
       const r = R(p), u = info(state.torre, state.andar, p), dim = !matches(p), pose = Predio3D.planPose(p);
       const x = X(r.x0) + 1, w = (r.x1 - r.x0) * S - 2, y = Y(r.z0) + 1, h = (r.z1 - r.z0) * S - 2;
@@ -244,8 +246,10 @@
           lugar = predio.enterUnit(u.pos);
           if (!lugar) throw new Error('andar fechado');
           lugar.renderWorld = predio.renderWith;
-          lugar.onView = function (v, forro) { predio.setAptView(v, forro); };
+          lugar.onView = function (v, forro, nivel) { predio.setAptView(v, forro, nivel); };
           $('aptHud').hidden = false;
+          $('aptRes').hidden = !lugar.reservado;
+          apto.temElevador = !!(lugar.lift && lugar.ground);
           apto.engine = window.AptEngine.create({
             tipo: u.tipo, andar: u.andar, apto: u.num, torre: u.torre, base: 'apartamento/',
             integrated: lugar, renderer: predio.renderer, canvas: predio.canvas, dom: hudDom(), onMessage: mensagemApto
@@ -272,14 +276,62 @@
       try { a.engine.dispose(); } catch (e) { console.error(e); }
     }
     $('aptHud').hidden = true; avisoEntrada('');
+    $('aptLift').hidden = true; $('aptLiftMenu').hidden = true; $('aptRide').hidden = true; $('aptRide').classList.remove('is-on');
     explorer.classList.remove('is-apto');
     if (predio) predio.exitUnit(cam);
     if (state.andar) { mostrarView('viewAndar'); if (state.pos && predio) predio.selectUnit(state.pos); } else mostrarView('viewAndares');
   }
   $('btnSairApto').addEventListener('click', sairApto);
   $('aptoComodos').addEventListener('click', function (ev) {
-    const b = ev.target.closest('[data-room]'); if (b && apto && apto.engine) apto.engine.room(b.dataset.room);
+    const b = ev.target.closest('[data-room]'); if (!b || !apto || !apto.engine) return;
+    if (b.dataset.room === 'terreo') { andarElevador('terreo'); return; }
+    apto.engine.room(b.dataset.room);
   });
+  /* ---------- elevador: chamado no hall do andar ou na portaria da torre; leva ao térreo do condomínio e de volta ---------- */
+  function menuElevador(abrir) {
+    const m = $('aptLiftMenu');
+    if (!abrir) { m.hidden = true; return; }
+    const u = apto.u, noTerreo = apto.nivel === 'ground';
+    m.innerHTML = '<p>Elevador · Torre ' + u.torre + '</p>' +
+      '<button type="button" data-dest="terreo"' + (noTerreo ? ' aria-current="true"' : '') + '><b>T</b><span>Térreo · piscina, salão, pracinha, portaria</span></button>' +
+      '<button type="button" data-dest="andar"' + (!noTerreo ? ' aria-current="true"' : '') + '><b>' + u.andar + '</b><span>' + u.andar + 'º andar · apto ' + u.num + '</span></button>';
+    m.hidden = false;
+  }
+  $('aptLiftBtn').addEventListener('click', function () { if (apto) menuElevador($('aptLiftMenu').hidden); });
+  $('aptLiftMenu').addEventListener('click', function (ev) {
+    const b = ev.target.closest('[data-dest]'); if (!b) return;
+    menuElevador(false); andarElevador(b.dataset.dest);
+  });
+  // a viagem: a tela escurece, o mostrador conta os andares e o visitante sai no destino
+  function andarElevador(dest) {
+    if (!apto || !apto.engine || apto.viagem || !apto.temElevador) return;
+    const a = apto, de = a.nivel === 'ground' ? 0 : a.u.andar, para = dest === 'terreo' ? 0 : a.u.andar;
+    if (de === para) { a.engine.lift(dest); return; }
+    a.viagem = true;
+    const ride = $('aptRide'), fl = $('aptRideFloor'), desce = para < de;
+    $('aptRideArrow').textContent = desce ? '▼' : '▲'; $('aptRideTxt').textContent = desce ? 'Descendo' : 'Subindo';
+    fl.textContent = de ? String(de) : 'T';
+    ride.hidden = false;
+    requestAnimationFrame(function () { ride.classList.add('is-on'); });
+    let n = de;
+    const passo = reduce ? 40 : Math.max(90, Math.min(190, 2000 / Math.max(1, Math.abs(para - de))));
+    setTimeout(function tick() {
+      if (apto !== a) { ride.classList.remove('is-on'); ride.hidden = true; return; }
+      if (n !== para) { n += desce ? -1 : 1; fl.textContent = n ? String(n) : 'T'; setTimeout(tick, passo); return; }
+      $('aptRideTxt').textContent = para ? 'Chegou ao ' + para + 'º andar' : 'Chegou ao térreo';
+      try { a.engine.lift(dest); } catch (e) { console.error(e); }
+      setTimeout(function () {
+        ride.classList.remove('is-on');
+        setTimeout(function () {
+          ride.hidden = true; a.viagem = false;
+          if (apto === a) {                                     // chegou já em frente ao elevador: o botão volta na hora
+            $('aptLift').hidden = !(a.temElevador && a.ultimoLift);
+            $('aptLiftBtn').textContent = a.ultimoLift === 'terreo' ? 'Chamar o elevador · subir' : 'Chamar o elevador';
+          }
+        }, 380);
+      }, reduce ? 60 : 520);
+    }, reduce ? 60 : 420);
+  }
   $('btnTelaCheia').addEventListener('click', function () {
     const alvo = $('canvasBox');
     try {
@@ -299,18 +351,29 @@
       apto.pronto = true;
       avisoEntrada('');
       $('aptoTotal').textContent = d.comodos + ' m²';
-      $('aptoComodos').innerHTML = d.rooms.map(function (r) {
-        return '<li><button type="button" class="room-btn' + (r.id === 'corredor' ? ' is-corr' : '') + '" data-room="' + esc(r.id) + '"><span class="rn">' + esc(r.name) + '</span>' +
-          (r.area ? '<span class="ra">' + esc(r.area) + ' m²</span>' : '<span class="ra">fora do apto</span>') +
+      const lista = d.rooms.concat(apto.temElevador ? [{ id: 'terreo', name: 'Térreo do condomínio', area: '', dims: '', nota: 'de elevador' }] : []);
+      $('aptoComodos').innerHTML = lista.map(function (r) {
+        return '<li><button type="button" class="room-btn' + (r.id === 'corredor' || r.id === 'terreo' ? ' is-corr' : '') + '" data-room="' + esc(r.id) + '"><span class="rn">' + esc(r.name) + '</span>' +
+          (r.area ? '<span class="ra">' + esc(r.area) + ' m²</span>' : '<span class="ra">' + (r.nota || 'fora do apto') + '</span>') +
           (r.dims ? '<span class="rd">' + esc(r.dims) + ' m</span>' : '') + '</button></li>';
       }).join('');
     } else if (d.type === 'apt:state') {
       document.querySelectorAll('#viewApto .seg-btn').forEach(function (b) { b.setAttribute('aria-pressed', String(VIEW_CMD[d.view] === b.dataset.cmd)); });
       document.querySelectorAll('#viewApto .tgl').forEach(function (b) { b.disabled = !!d.imm && (b.dataset.cmd === 'tRotate' || b.dataset.cmd === 'tWalls'); });
-      document.querySelectorAll('#aptoComodos .room-btn').forEach(function (b) { b.setAttribute('aria-current', String(!!d.imm && d.room === b.dataset.room)); });
-      $('aptoDica').textContent = d.imm
-        ? 'Clique nas portas, luzes e interruptores, janelas e persianas, TVs, torneiras, chuveiro, fogão, privada, camas e sofá. A porta de entrada dá para o corredor.'
-        : 'Toque num cômodo para entrar nele, em Visitar para andar pelo apartamento ou em Voar para ver o prédio em volta.';
+      apto.nivel = d.level || 'apt';
+      const terreo = apto.nivel === 'ground';
+      document.querySelectorAll('#aptoComodos .room-btn').forEach(function (b) { b.setAttribute('aria-current', String(!!d.imm && (terreo ? b.dataset.room === 'terreo' : d.room === b.dataset.room))); });
+      $('aptoDica').textContent = terreo
+        ? 'Você está no térreo do condomínio. Ande até a piscina, o salão de festas, os quiosques, a pracinha, o espaço pet e a portaria. Para voltar ao apto, entre na portaria da torre e chame o elevador.'
+        : d.imm
+          ? 'Clique nas portas, luzes e interruptores, janelas e persianas, TVs, torneiras, chuveiro, fogão, privada, camas e sofá. A porta de entrada dá para o corredor; no hall, chame o elevador para descer ao térreo.'
+          : 'Toque num cômodo para entrar nele, em Visitar para andar pelo apartamento ou em Voar para ver o prédio em volta.';
+      // botão do elevador: aparece em frente às portas do elevador (andar) e embaixo do pórtico da torre (térreo)
+      apto.ultimoLift = d.lift || null;
+      const pode = !!(apto.temElevador && d.lift && !apto.viagem);
+      $('aptLift').hidden = !pode;
+      $('aptLiftBtn').textContent = d.lift === 'terreo' ? 'Chamar o elevador · subir' : 'Chamar o elevador';
+      if (!pode) $('aptLiftMenu').hidden = true;
     } else if (d.type === 'apt:error') {
       avisoEntrada('A maquete não abriu neste navegador. Ela precisa de WebGL.');
     }
